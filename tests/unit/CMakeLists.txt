@@ -136,7 +136,6 @@ set(UNIT_TESTS_SRCS
   fem/test_hu_zhang.cpp
   fem/test_hct.cpp
   fem/test_johnson_mercier.cpp
-  fem/test_jm_hx.cpp
   fem/test_gslib.cpp
   fem/test_hp_transfer.cpp
   fem/test_intrules.cpp

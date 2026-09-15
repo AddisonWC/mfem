@@ -1,6 +1,6 @@
 // Shared implementation for the JM HX comparison example and its tests.
-#ifndef MFEM_EX43_HX_COMPARE_HPP
-#define MFEM_EX43_HX_COMPARE_HPP
+#ifndef ADDISONS_EXPERIMENTS_JM_COMMON_HPP
+#define ADDISONS_EXPERIMENTS_JM_COMMON_HPP
 
 #include "mfem.hpp"
 #include <cmath>

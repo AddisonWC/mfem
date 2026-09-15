@@ -1,7 +1,12 @@
 # Johnson–Mercier multigrid with split patches
 
-`ex43_mg_compare` investigates geometric multigrid for the same stress problem as
-`ex43` and `ex43_hx_compare`:
+These are historical measurements from before the directory reorganization.
+Program names and commands below use the current standalone layout; see the
+[README](../../README.md) for build instructions and provenance.
+
+
+`mg_compare` investigates geometric multigrid for the same stress problem as
+`ex43` and `hx_compare`:
 
 \[
  A(\sigma,\tau)=(\sigma,\tau)+(\mathrm{div}\,\sigma,\mathrm{div}\,\tau).
@@ -54,14 +59,14 @@ makes this a conservative common interval for positive symmetric smoothing.
 ## Build and run
 
 ```sh
-cmake --build build-hx --target ex43_mg_compare -j 4
-cd build-hx/examples
-OPENBLAS_NUM_THREADS=1 ./ex43_mg_compare -r 5 > triangle.csv
-OPENBLAS_NUM_THREADS=1 ./ex43_mg_compare -m ../data/inline-tri.mesh -r 3 > square.csv
-OPENBLAS_NUM_THREADS=1 ./ex43_mg_compare -r 5 -s 2 > two-sweeps.csv
+cmake --build addisons_experiments/build --target mg_compare -j 4
+cd addisons_experiments/build
+OPENBLAS_NUM_THREADS=1 ./mg_compare -r 5 > triangle.csv
+OPENBLAS_NUM_THREADS=1 ./mg_compare -m data/inline-tri.mesh -r 3 > square.csv
+OPENBLAS_NUM_THREADS=1 ./mg_compare -r 5 -s 2 > two-sweeps.csv
 ```
 
-The configured examples Makefile also supports `make ex43_mg_compare`.
+Configure the standalone project first; see [the README](../../README.md).
 `-cr` sets refinements before the coarse grid is constructed; `-r` adds levels
 above it. `-smoother` selects one configuration or `all`. `-s` controls the number
 of smoothing steps on each side of the coarse correction. SuiteSparse supplies
@@ -84,7 +89,7 @@ small endpoint and barycenter blocks removes coupled local corrections.
 Rapid iteration growth with these blocks is consistent with poor smoothing of
 those modes; the experiment alone does not prove a kernel-decomposition theorem.
 
-The validation case in `tests/unit/fem/test_jm_hx.cpp` checks that the full
+The validation case in `johnson_mercier/tests/test_jm_hx.cpp` checks that the full
 macro-patch V-cycle agrees between bases, each of the three V-cycles is symmetric
 and has positive quadratic action on a test vector, the split cycle differs
 from the macro cycle, and the shared moment prolongation action remains exactly
@@ -93,7 +98,7 @@ spectral bounds.
 
 ## Recorded results
 
-[ex43_mg_results.csv](ex43_mg_results.csv) contains 63 configurations from a
+[mg_results.csv](../results/mg_results.csv) contains 63 configurations from a
 Release build with UMFPACK and `OPENBLAS_NUM_THREADS=1`. The first three datasets
 use the commands above; `triangle_damped` uses `-r 4 -damping 0.49`. The tolerance
 is `1e-8` and the iteration limit is 2000 throughout. Failed solves are retained
@@ -133,5 +138,5 @@ smaller factorizations do not compensate for the iteration growth in these
 experiments. The favorable split-patch behavior in the HX experiment does not
 carry over to this multigrid coarse correction.
 
-The new example's CTest smoke test passes, as do 415 assertions in the two
+At the time of measurement, the comparison's CTest smoke test passed, as do 415 assertions in the two
 focused JM HX/multigrid unit cases, including the unchanged-transfer regression.

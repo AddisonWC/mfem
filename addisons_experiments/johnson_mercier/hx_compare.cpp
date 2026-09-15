@@ -6,14 +6,14 @@
 // always present. Split patches always denote the intrinsic split-vertex
 // subspaces, including when the selected basis is the moment basis.
 //
-// Examples (from the build's examples directory):
-//   ./ex43_hx_compare -r 1 -levels 3
-//   ./ex43_hx_compare -r 3 -basis vertex -smoother jacobi -h1 split
+// Examples (from addisons_experiments/build):
+//   ./hx_compare -r 1 -levels 3
+//   ./hx_compare -r 3 -basis vertex -smoother jacobi -h1 split
 //
 // Output is CSV. Direct auxiliary solves isolate the decomposition experiment;
-// these are not a claim of a scalable auxiliary solver. See ex43_hx_compare.md.
+// these are not a claim of a scalable auxiliary solver. See reports/hx_compare.md.
 
-#include "ex43_hx_compare.hpp"
+#include "common.hpp"
 #include <algorithm>
 #include <chrono>
 #include <iomanip>
@@ -53,7 +53,7 @@ public:
 
 int main(int argc, char *argv[])
 {
-   const char *mesh_file = "../data/ref-triangle.mesh";
+   const char *mesh_file = JM_DEFAULT_MESH;
    const char *basis_arg = "all", *smoother_arg = "all", *h1_arg = "all";
    int refinements = 2, levels = 1, repeats = 3, max_iterations = 1000;
    real_t tolerance = 1e-8, damping = 1.0;

@@ -1,6 +1,6 @@
 // Tests for the split-mesh JM HX and multigrid experiments.
 #include "unit_tests.hpp"
-#include "../../../examples/ex43_hx_compare.hpp"
+#include "common.hpp"
 
 using namespace mfem;
 using namespace mfem::jm_hx;

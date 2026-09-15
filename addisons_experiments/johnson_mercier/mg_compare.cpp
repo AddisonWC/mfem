@@ -1,7 +1,7 @@
 // JM geometric multigrid with macro or split-vertex patch smoothers.
 // All level operators and transfers stay in the original moment coordinates.
-// See ex43_mg_compare.md for the experiment and its measured results.
-#include "ex43_hx_compare.hpp"
+// See reports/mg_compare.md for the experiment and its measured results.
+#include "common.hpp"
 #include <chrono>
 #include <iomanip>
 #include <iostream>
@@ -66,7 +66,7 @@ struct Level
 
 int main(int argc, char *argv[])
 {
-   const char *mesh_file = "../data/ref-triangle.mesh";
+   const char *mesh_file = JM_DEFAULT_MESH;
    const char *choice_arg = "all";
    int refinements = 3, coarse_refinements = 0, steps = 1, max_it = 2000;
    real_t damping = 0.33, tolerance = 1e-8;

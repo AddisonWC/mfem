@@ -1,6 +1,11 @@
 # Johnson–Mercier HX comparisons
 
-`ex43_hx_compare` solves the symmetric-tensor H(div) problem
+These are historical measurements from before the directory reorganization.
+Program names and commands below use the current standalone layout; see the
+[README](../../README.md) for build instructions and provenance.
+
+
+`hx_compare` solves the symmetric-tensor H(div) problem
 
 \[
  a(\sigma,\tau)=(\sigma,\tau)+(\operatorname{div}\sigma,
@@ -14,18 +19,17 @@ conforming, straight 2D triangle mesh. It is a serial, assembled experiment.
 
 ## Build and run
 
-Build the `ex43_hx_compare` CMake target, or use `make ex43_hx_compare` in the
-examples directory of a configured MFEM build. SuiteSparse is recommended:
+Build the standalone project following [the README](../../README.md). SuiteSparse is recommended:
 auxiliary inverses use UMFPACK when available. Without it, a fixed dense LU
 factorization is used, limited to auxiliary matrices of size 2000. There are no
 tolerance-based inner iterative solves.
 
-From the build's `examples` directory:
+From `addisons_experiments/build`:
 
 ```sh
-OPENBLAS_NUM_THREADS=1 ./ex43_hx_compare -r 2 -levels 4 -repeat 5 > triangle.csv
-OPENBLAS_NUM_THREADS=1 ./ex43_hx_compare -m ../data/inline-tri.mesh -r 0 -levels 3 > square.csv
-./ex43_hx_compare -r 3 -basis vertex -smoother jacobi -h1 split
+OPENBLAS_NUM_THREADS=1 ./hx_compare -r 2 -levels 4 -repeat 5 > triangle.csv
+OPENBLAS_NUM_THREADS=1 ./hx_compare -m data/inline-tri.mesh -r 0 -levels 3 > square.csv
+./hx_compare -r 3 -basis vertex -smoother jacobi -h1 split
 ```
 
 The selectors accept:
@@ -147,17 +151,17 @@ scalability of the auxiliary inverses themselves.
 
 ## Recorded experiments
 
-[ex43_hx_results.csv](ex43_hx_results.csv) records 144 configurations, each with
+[hx_results.csv](../results/hx_results.csv) records 144 configurations, each with
 five repeated solves. All converged with a recomputed relative residual below
 `1e-8`. These measurements used a Release build with GCC 16.2.1, UMFPACK, and
 `OPENBLAS_NUM_THREADS=1` on an AMD Ryzen 7 5825U. The dataset names correspond to:
 
 ```sh
-# All commands run in the build's examples directory with OPENBLAS_NUM_THREADS=1.
-./ex43_hx_compare -r 2 -levels 4 -repeat 5
-./ex43_hx_compare -r 2 -levels 4 -repeat 5 -smooth-rhs
-./ex43_hx_compare -m ../data/inline-tri.mesh -r 0 -levels 3 -repeat 5
-./ex43_hx_compare -r 5 -repeat 5 -damping 0.33
+# Run in addisons_experiments/build with OPENBLAS_NUM_THREADS=1.
+./hx_compare -r 2 -levels 4 -repeat 5
+./hx_compare -r 2 -levels 4 -repeat 5 -smooth-rhs
+./hx_compare -m data/inline-tri.mesh -r 0 -levels 3 -repeat 5
+./hx_compare -r 5 -repeat 5 -damping 0.33
 ```
 
 They are labeled `triangle_random`, `triangle_smooth`, `square_random`, and
@@ -231,9 +235,9 @@ tune damping per smoother before selecting a default. On these problems, exact
 macro patches remain the strongest option by iteration count and solve time;
 the split patches offer substantially smaller local factorizations.
 
-Validation includes 3,215 passing assertions in the JM/HCT/HX tests, covering
+The original validation recorded 3,215 passing assertions in the JM/HCT/HX tests, covering
 physical basis equivalence, vertex support, traction continuity, canonical
 interpolation, refinement/update transfer, Airy divergence, split H1 inclusion,
 macro-patch invariance, and mass decomposition bounds. The existing `ex43` and
-`ex43_hx` CTest cases and the new example smoke test also pass. The dense inverse
+`ex43_hx` CTest cases and the comparison smoke test also passed. The dense inverse
 fallback was separately exercised on all 12 small-mesh configurations.
