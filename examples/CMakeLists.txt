@@ -51,6 +51,7 @@ list(APPEND ALL_EXE_SRCS
   ex43.cpp
   ex43_hx.cpp
   ex43_hx_compare.cpp
+  ex43_mg_compare.cpp
   ex44.cpp
   )
 
@@ -140,6 +141,8 @@ if (MFEM_ENABLE_TESTING)
       list(APPEND THIS_TEST_OPTIONS "-mi" "3")
     elseif(${TEST_NAME} MATCHES "ex41p*")
       list(APPEND THIS_TEST_OPTIONS "-tf" "1.0")
+    elseif(${TEST_NAME} STREQUAL "ex43_mg_compare")
+      set(THIS_TEST_OPTIONS "-r" "2")
     elseif(${TEST_NAME} STREQUAL "ex43_hx_compare")
       set(THIS_TEST_OPTIONS "-r" "1" "-repeat" "1")
     endif()

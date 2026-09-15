@@ -1,4 +1,4 @@
-// Tests for the split-mesh JM HX experiment.
+// Tests for the split-mesh JM HX and multigrid experiments.
 #include "unit_tests.hpp"
 #include "../../../examples/ex43_hx_compare.hpp"
 
@@ -119,4 +119,68 @@ TEST_CASE("JM HX coordinate maps and split H1 inclusion", "[JohnsonMercier][HX]"
          }
       }
    }
+}
+
+TEST_CASE("JM multigrid patches preserve moment prolongation", "[JohnsonMercier][HX][Multigrid]")
+{
+   JohnsonMercierFECollection fm, fv(JMBasis::SplitVertex);
+   auto mesh = new Mesh(Mesh::MakeCartesian2D(1, 1, Element::TRIANGLE, true));
+   auto coarse = new FiniteElementSpace(mesh, &fm);
+   FiniteElementSpaceHierarchy hierarchy(mesh, coarse, true, true);
+   hierarchy.AddUniformlyRefinedLevel(1, Ordering::byVDIM, Operator::MFEM_SPARSEMAT);
+   auto &fine = hierarchy.GetFinestFESpace();
+   FiniteElementSpace vertices(fine.GetMesh(), &fv);
+   BilinearForm ac(coarse), af(&fine);
+   for (auto form : {&ac, &af})
+   {
+      form->AddDomainIntegrator(new MatrixFEMassIntegrator);
+      form->AddDomainIntegrator(new MatrixDivDivIntegrator);
+      form->Assemble(); form->Finalize();
+   }
+   auto B = BasisMatrix(fine, vertices);
+   std::unique_ptr<SparseMatrix> av(RAP(*B, af.SpMat(), *B));
+   ExactSolver inverse(ac.SpMat());
+   PatchSolver macro(af.SpMat(), fine, false), vertex(*av, vertices, false),
+               split(*av, vertices, true);
+   MappedSolver mapped_macro(*B, vertex), mapped_split(*B, split);
+   // Scale symmetrically using a tiny wrapper, as in the example.
+   class Scaled : public Solver
+   {
+      const Solver &R;
+   public:
+      Scaled(const Solver &r) : Solver(r.Height()), R(r) { }
+      void Mult(const Vector &x, Vector &y) const override
+      { R.Mult(x, y); y *= 0.33; }
+      void MultTranspose(const Vector &x, Vector &y) const override { Mult(x, y); }
+      void SetOperator(const Operator &) override { MFEM_ABORT("fixed"); }
+   } sm(macro), sv(mapped_macro), ss(mapped_split);
+   Array<Operator *> ops, transfers;
+   ops.Append(&ac.SpMat()); ops.Append(&af.SpMat());
+   transfers.Append(hierarchy.GetProlongationAtLevel(0));
+   Array<bool> own_ops(2), own_transfers(1); own_ops = false; own_transfers = false;
+   Vector c(coarse->GetVSize()), before(fine.GetVSize()), after(fine.GetVSize());
+   for (int i = 0; i < c.Size(); i++) { c(i) = std::cos(i+0.4); }
+   transfers[0]->Mult(c, before);
+   Vector rhs(fine.GetVSize()), ym(rhs.Size()), yv(rhs.Size()), ys(rhs.Size());
+   for (int i = 0; i < rhs.Size(); i++) { rhs(i) = std::sin(i+0.7); }
+   Solver *variants[] = {&sm, &sv, &ss};
+   Vector *answers[] = {&ym, &yv, &ys};
+   for (int k = 0; k < 3; k++)
+   {
+      Array<Solver *> smoothers; smoothers.Append(&inverse); smoothers.Append(variants[k]);
+      Multigrid mg(ops, smoothers, transfers, own_ops, own_ops, own_transfers);
+      mg.SetCycleType(Multigrid::CycleType::VCYCLE, 1, 1);
+      mg.Mult(rhs, *answers[k]);
+      REQUIRE(rhs * *answers[k] > 0.0);
+      // Check symmetry of the full V-cycle, including mapped smoothing.
+      Vector z(rhs.Size()); mg.Mult(before, z);
+      REQUIRE(std::abs(before * *answers[k] - rhs*z) <
+              1e-10*before.Norml2()*answers[k]->Norml2());
+   }
+   yv -= ym;
+   REQUIRE(yv.Norml2() < 1e-10*ym.Norml2());
+   ys -= ym;
+   REQUIRE(ys.Norml2() > 1e-5*ym.Norml2());
+   transfers[0]->Mult(c, after); after -= before;
+   REQUIRE(after.Norml2() == 0.0);
 }
