@@ -78,7 +78,8 @@ TEST_CASE("HCT to Johnson-Mercier Airy interpolation",
       point[1] = -0.1 + 0.2*x + 0.8*y;
    }
    HCT_FECollection hct_collection;
-   JohnsonMercierFECollection jm_collection;
+   JohnsonMercierFECollection jm_collection(GENERATE(JMBasis::Moments,
+                                                     JMBasis::SplitVertex));
    FiniteElementSpace hct_space(&mesh, &hct_collection);
    FiniteElementSpace jm_space(&mesh, &jm_collection);
    DiscreteLinearOperator airy(&hct_space, &jm_space);

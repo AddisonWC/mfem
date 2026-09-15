@@ -201,6 +201,10 @@ FiniteElementCollection *FiniteElementCollection::New(const char *name)
    {
       fec = new JohnsonMercierFECollection;
    }
+   else if (!strcmp(name, "JM_2D_P1_SplitVertex"))
+   {
+      fec = new JohnsonMercierFECollection(JMBasis::SplitVertex);
+   }
    else if (!strcmp(name, "ND1_3D"))
    {
       fec = new ND1_3DFECollection;
@@ -1038,6 +1042,11 @@ const int *JohnsonMercierFECollection::DofOrderForOrientation(
    // moments are unchanged, while the linear moment polynomial changes sign.
    static int ind_pos[] = {0, 1, 2, 3};
    static int ind_neg[] = {0, 1, -3, -4};
+   static int endpoints_reversed[] = {2, 3, 0, 1};
+   if (GetBasisType() == JMBasis::SplitVertex)
+   {
+      return Or > 0 ? ind_pos : endpoints_reversed;
+   }
    return Or > 0 ? ind_pos : ind_neg;
 }
 

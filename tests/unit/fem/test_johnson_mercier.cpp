@@ -389,7 +389,8 @@ TEST_CASE("Johnson-Mercier finite element space transfer",
    Mesh coarse_mesh = Mesh::MakeCartesian2D(2, 2, Element::TRIANGLE, true);
    Mesh fine_mesh(coarse_mesh);
    fine_mesh.UniformRefinement();
-   JohnsonMercierFECollection fec;
+   JohnsonMercierFECollection fec(GENERATE(JMBasis::Moments,
+                                          JMBasis::SplitVertex));
    const int vdim = GENERATE(1, 2);
    const auto ordering = GENERATE(Ordering::byNODES, Ordering::byVDIM);
    FiniteElementSpace coarse_fes(&coarse_mesh, &fec, vdim, ordering);
@@ -467,11 +468,101 @@ TEST_CASE("Johnson-Mercier assembly", "[BilinearForm][JohnsonMercier]")
    REQUIRE(load.Norml2() > 0.0);
 }
 
+TEST_CASE("Johnson-Mercier split-vertex basis", "[FiniteElement][JohnsonMercier]")
+{
+   JohnsonMercierTriangleFiniteElement moment, vertex(JMBasis::SplitVertex);
+   std::unique_ptr<FiniteElementCollection> factory(
+      FiniteElementCollection::New("JM_2D_P1_SplitVertex"));
+   REQUIRE(std::string(factory->Name()) == "JM_2D_P1_SplitVertex");
+   Mesh mesh = Mesh::MakeCartesian2D(1, 1, Element::TRIANGLE, true);
+   for (int v = 0; v < mesh.GetNV(); v++)
+   {
+      real_t *p = mesh.GetVertex(v);
+      const real_t x = p[0], y = p[1];
+      p[0] = 0.3 + 1.7*x + 0.4*y;
+      p[1] = -0.2 + 0.2*x + 0.9*y;
+   }
+   H1_FECollection h1(2, 2);
+   const int owner[15] = {0,0,1,1,1,1,2,2,2,2,0,0,3,3,3};
+   const real_t points[4][2] = {{0,0},{1,0},{0,1},{1.0/3,1.0/3}};
+   for (int e = 0; e < mesh.GetNE(); e++)
+   {
+      auto &T = *mesh.GetElementTransformation(e);
+      DenseMatrix C, B(15), Pm, Pv, expected;
+      vertex.GetMomentToSplitVertexMatrix(T, C);
+      DenseMatrixInverse(C).GetInverseMatrix(B);
+      moment.Project(*h1.FiniteElementForGeometry(Geometry::TRIANGLE), T, Pm);
+      vertex.Project(*h1.FiniteElementForGeometry(Geometry::TRIANGLE), T, Pv);
+      expected.SetSize(Pv.Height(), Pv.Width());
+      Mult(C, Pm, expected);
+      expected -= Pv;
+      REQUIRE(expected.MaxMaxNorm() < 1e-10);
+
+      // Extrapolate the affine polynomial in EACH child to its vertices.
+      // Direct evaluation on an interface would select only one child.
+      for (int child = 0; child < 3; child++)
+      {
+         int ids[3] = {(child+1)%3, (child+2)%3, 3};
+         DenseTensor samples[3] = {DenseTensor(2,2,15),
+                                   DenseTensor(2,2,15), DenseTensor(2,2,15)};
+         for (int q = 0; q < 3; q++)
+         {
+            IntegrationPoint ip;
+            real_t x = 0.0, y = 0.0;
+            for (int p = 0; p < 3; p++)
+            {
+               const real_t w = p == q ? 2.0/3 : 1.0/6;
+               x += w*points[ids[p]][0]; y += w*points[ids[p]][1];
+            }
+            ip.Set2(x,y); T.SetIntPoint(&ip);
+            vertex.CalcMShape(T, samples[q]);
+            DenseTensor old(2,2,15);
+            moment.CalcMShape(T, old);
+            DenseMatrix dm(15,2), dv(15,2), db(15,2);
+            moment.CalcPhysDivShape(T, dm);
+            vertex.CalcPhysDivShape(T, dv);
+            MultAtB(B, dm, db); db -= dv;
+            REQUIRE(db.MaxMaxNorm() < 1e-10);
+            for (int k = 0; k < 15; k++)
+            {
+               for (int i = 0; i < 2; i++)
+               {
+                  for (int j = 0; j < 2; j++)
+                  {
+                     real_t val = 0.0;
+                     for (int l = 0; l < 15; l++)
+                     { val += old(i,j,l)*B(l,k); }
+                     REQUIRE(val == MFEM_Approx(samples[q](i,j,k)).margin(1e-11));
+                  }
+               }
+            }
+         }
+         for (int q = 0; q < 3; q++)
+         {
+            for (int k = 0; k < 15; k++)
+            {
+               if (owner[k] == ids[q]) { continue; }
+               for (int i = 0; i < 2; i++)
+               {
+                  for (int j = 0; j < 2; j++)
+                  {
+                     const real_t val = 2*samples[q](i,j,k) -
+                        (samples[0](i,j,k)+samples[1](i,j,k)+samples[2](i,j,k))/3;
+                     REQUIRE(std::abs(val) < 1e-10);
+                  }
+               }
+            }
+         }
+      }
+   }
+}
+
 TEST_CASE("Johnson-Mercier physical traction continuity",
           "[FiniteElementSpace][JohnsonMercier]")
 {
    Mesh mesh = Mesh::MakeCartesian2D(2, 2, Element::TRIANGLE, true);
-   JohnsonMercierFECollection fec;
+   JohnsonMercierFECollection fec(GENERATE(JMBasis::Moments,
+                                          JMBasis::SplitVertex));
    FiniteElementSpace fes(&mesh, &fec);
    Vector x(fes.GetVSize());
    for (int i = 0; i < x.Size(); i++) { x(i) = std::sin(real_t(i + 1)); }
@@ -527,7 +618,8 @@ TEST_CASE("Johnson-Mercier physical interpolation invariants",
    }
    Mesh fine_mesh(coarse_mesh);
    fine_mesh.UniformRefinement();
-   JohnsonMercierFECollection fec;
+   JohnsonMercierFECollection fec(GENERATE(JMBasis::Moments,
+                                          JMBasis::SplitVertex));
    FiniteElementSpace coarse(&coarse_mesh, &fec), fine(&fine_mesh, &fec);
    OperatorHandle P(Operator::MFEM_SPARSEMAT);
    fine.GetTransferOperator(coarse, P);

@@ -174,10 +174,13 @@ real_t InternalConstraint(const int raw, const int vertex, const int endpoint,
 
 } // namespace
 
-JohnsonMercierTriangleFiniteElement::JohnsonMercierTriangleFiniteElement()
+JohnsonMercierTriangleFiniteElement::JohnsonMercierTriangleFiniteElement(
+   JMBasis type)
    : FiniteElement(2, Geometry::TRIANGLE, jm_dof, 1, FunctionSpace::Pk),
-     basis(jm_dof, raw_dof)
+     basis(jm_dof, raw_dof), basis_type(type)
 {
+   MFEM_VERIFY(type == JMBasis::Moments || type == JMBasis::SplitVertex,
+               "invalid JM basis");
    range_type = MATRIX;
    map_type = DOUBLE_CONTRAVARIANT_PIOLA;
    deriv_type = DIV;
@@ -223,14 +226,27 @@ JohnsonMercierTriangleFiniteElement::JohnsonMercierTriangleFiniteElement()
       for (int j = 0; j < raw_dof; j++) { basis(i,j) = inverse(i,j); }
    }
 
+   if (basis_type == JMBasis::SplitVertex)
+   {
+      DenseMatrix identity(2), inverse_change(jm_dof), transformed;
+      identity = 0.0;
+      identity(0,0) = identity(1,1) = 1.0;
+      GetMomentToSplitVertexMatrix(identity, reference_change);
+      DenseMatrixInverse(reference_change).GetInverseMatrix(inverse_change);
+      transformed.SetSize(jm_dof, raw_dof);
+      MultAtB(inverse_change, basis, transformed);
+      basis = transformed;
+   }
+
    for (int edge = 0; edge < 3; edge++)
    {
       const real_t *a = vertices[edge_vertices[edge][0]];
       const real_t *b = vertices[edge_vertices[edge][1]];
       for (int j = 0; j < 4; j++)
       {
-         Nodes.IntPoint(4*edge + j).Set2(0.5*(a[0] + b[0]),
-                                         0.5*(a[1] + b[1]));
+         const real_t r = basis_type == JMBasis::Moments ? 0.5 : j/2;
+         Nodes.IntPoint(4*edge + j).Set2((1.0-r)*a[0] + r*b[0],
+                                        (1.0-r)*a[1] + r*b[1]);
       }
    }
    for (int j = 12; j < 15; j++)
@@ -344,6 +360,74 @@ void JohnsonMercierTriangleFiniteElement::GetFacetTransform(
          A(nn,nn) = length;
          A(nn,nt) = -alpha/length;
          A(nt,nt) = det/length;
+      }
+   }
+   if (basis_type == JMBasis::SplitVertex)
+   {
+      DenseMatrix change, inverse_change(jm_dof), right(jm_dof);
+      GetMomentToSplitVertexMatrix(J, change);
+      DenseMatrixInverse(change).GetInverseMatrix(inverse_change);
+      // Shapes are stored in rows: A_vertex = C_phys^{-T} A_moment C_ref^T.
+      // Using this correction also preserves the physical-transfer composition.
+      MultABt(A, reference_change, right);
+      MultAtB(inverse_change, right, A);
+   }
+}
+
+void JohnsonMercierTriangleFiniteElement::GetMomentToSplitVertexMatrix(
+   ElementTransformation &Trans, DenseMatrix &change) const
+{
+   const IntegrationPoint &center = Geometries.GetCenter(Geometry::TRIANGLE);
+   Trans.SetIntPoint(&center);
+   MFEM_VERIFY(Trans.GetSpaceDim() == 2 && Trans.Hessian().FNorm2() < 1e-20,
+               "JM basis changes require affine 2D triangles");
+   GetMomentToSplitVertexMatrix(Trans.Jacobian(), change);
+}
+
+void JohnsonMercierTriangleFiniteElement::GetMomentToSplitVertexMatrix(
+   const DenseMatrix &J, DenseMatrix &change) const
+{
+   // Use the moment element even when this object has the split-vertex basis.
+   static const JohnsonMercierTriangleFiniteElement moments;
+   change.SetSize(jm_dof);
+   change = 0.0;
+   for (int edge = 0; edge < 3; edge++)
+   {
+      const real_t *a = vertices[edge_vertices[edge][0]];
+      const real_t *b = vertices[edge_vertices[edge][1]];
+      const real_t dx = b[0]-a[0], dy = b[1]-a[1];
+      const real_t length = std::hypot(J(0,0)*dx + J(0,1)*dy,
+                                      J(1,0)*dx + J(1,1)*dy);
+      for (int comp = 0; comp < 2; comp++)
+      {
+         const int i = 4*edge + comp;
+         change(i,i) = change(i+2,i) = 1.0/length;
+         change(i,i+2) = -3.0/length;
+         change(i+2,i+2) = 3.0/length;
+      }
+   }
+   DenseTensor shape(2, 2, jm_dof);
+   moments.CalcMShape(Geometries.GetCenter(Geometry::TRIANGLE), shape);
+   DenseMatrix A;
+   moments.GetFacetTransform(J, A);
+   const real_t det2 = J.Det()*J.Det();
+   for (int k = 0; k < jm_dof; k++)
+   {
+      for (int comp = 0; comp < 3; comp++)
+      {
+         const int i = comp == 2 ? 1 : 0;
+         const int j = comp == 0 ? 0 : 1;
+         for (int l = 0; l < jm_dof; l++)
+         {
+            for (int a = 0; a < 2; a++)
+            {
+               for (int b = 0; b < 2; b++)
+               {
+                  change(12+comp,k) +=
+                     A(k,l)*J(i,a)*shape(a,b,l)*J(j,b)/det2;
+               }
+            }
+         }
       }
    }
 }
@@ -527,6 +611,13 @@ void JohnsonMercierTriangleFiniteElement::Project(
          }
       }
    }
+   if (basis_type == JMBasis::SplitVertex)
+   {
+      DenseMatrix change, transformed(jm_dof, I.Width());
+      GetMomentToSplitVertexMatrix(Trans, change);
+      Mult(change, I, transformed);
+      I = transformed;
+   }
 }
 
 void JohnsonMercierTriangleFiniteElement::GetTransferMatrix(
@@ -668,6 +759,13 @@ void JohnsonMercierTriangleFiniteElement::GetTransferMatrix(
       }
    }
 
+   if (basis_type == JMBasis::SplitVertex)
+   {
+      DenseMatrix change, transformed(jm_dof, I.Width());
+      GetMomentToSplitVertexMatrix(J, change);
+      Mult(change, I, transformed);
+      I = transformed;
+   }
    for (int i = 0; i < I.Height(); i++)
    {
       for (int j = 0; j < I.Width(); j++)

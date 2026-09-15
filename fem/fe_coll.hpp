@@ -1095,15 +1095,19 @@ public:
 /** @brief Lowest-order Johnson--Mercier finite elements in 2D.
 
     This collection is defined only on triangles. It provides symmetric
-    matrix-valued H(div) elements with four traction moments per edge and
-    three interior moments. */
+    matrix-valued H(div) elements with four DOFs per edge and three interior
+    DOFs. Endpoint traction and barycenter value coordinates are available
+    through JMBasis::SplitVertex, with the same entity ownership. */
 class JohnsonMercierFECollection : public FiniteElementCollection
 {
 private:
    const JohnsonMercierTriangleFiniteElement TriangleFE;
 
 public:
-   JohnsonMercierFECollection() : FiniteElementCollection(1) { }
+   explicit JohnsonMercierFECollection(JMBasis type = JMBasis::Moments)
+      : FiniteElementCollection(1), TriangleFE(type) { }
+
+   JMBasis GetBasisType() const { return TriangleFE.GetBasisType(); }
 
    const FiniteElement *
    FiniteElementForGeometry(Geometry::Type GeomType) const override;
@@ -1113,7 +1117,11 @@ public:
    const int *DofOrderForOrientation(Geometry::Type GeomType,
                                      int Or) const override;
 
-   const char *Name() const override { return "JM_2D_P1"; }
+   const char *Name() const override
+   {
+      return GetBasisType() == JMBasis::Moments ? "JM_2D_P1" :
+             "JM_2D_P1_SplitVertex";
+   }
 
    int GetContType() const override { return NORMAL; }
 };
