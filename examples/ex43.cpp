@@ -3,8 +3,8 @@
 // Compile with: make ex43
 //
 // Description: Solve a div-div plus mass problem for a symmetric matrix
-// field using the lowest-order 2D Johnson--Mercier element and geometric
-// multigrid with vertex-patch Schwarz smoothers.
+// field using lowest-order 2D Johnson--Mercier, Arnold--Winther, or Hu--Zhang elements
+// and geometric multigrid with vertex-patch Schwarz smoothers.
 
 #include "ex43.hpp"
 #include <iostream>
@@ -12,19 +12,18 @@
 using namespace mfem;
 using namespace std;
 
-class JohnsonMercierMultigrid : public GeometricMultigrid
+class SymmetricMatrixMultigrid : public GeometricMultigrid
 {
    std::unique_ptr<Solver> coarse_prec;
 public:
-   JohnsonMercierMultigrid(FiniteElementSpaceHierarchy &fespaces,
-                           const Array<int> &ess_bdr,
-                           bool exact_smoother)
-      : GeometricMultigrid(fespaces, ess_bdr)
+   SymmetricMatrixMultigrid(FiniteElementSpaceHierarchy &fes_hierarchy,
+                            const Array<int> &ess_bdr)
+      : GeometricMultigrid(fes_hierarchy, ess_bdr)
    {
-      const int num_levels = fespaces.GetNumLevels();
+      const int num_levels = fes_hierarchy.GetNumLevels();
       for (int level = 0; level < num_levels; level++)
       {
-         FiniteElementSpace &fespace = fespaces.GetFESpaceAtLevel(level);
+         FiniteElementSpace &fespace = fes_hierarchy.GetFESpaceAtLevel(level);
          BilinearForm *form = new BilinearForm(&fespace);
          form->AddDomainIntegrator(new MatrixDivDivIntegrator);
          form->AddDomainIntegrator(new MatrixFEMassIntegrator);
@@ -42,7 +41,7 @@ public:
                      "expected an assembled sparse level operator");
 
          Solver *level_solver;
-         if (level == 0 || (exact_smoother && level + 1 < num_levels))
+         if (level == 0)
          {
 #ifdef MFEM_USE_SUITESPARSE
             level_solver = new UMFPackSolver(*sparse_operator);
@@ -72,9 +71,10 @@ int main(int argc, char *argv[])
    const char *mesh_file = "../data/ref-triangle.mesh";
    int geometric_refinements = 2;
    bool visualization = false;
-   bool exact_smoother = false;
-   bool patch_only = false;
    bool random_rhs = false;
+   bool use_aw = false;
+   bool use_hz = false;
+   bool use_hzzz = false;
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh", "Input triangle mesh.");
    args.AddOption(&geometric_refinements, "-r", "--refinements",
@@ -82,56 +82,66 @@ int main(int argc, char *argv[])
    args.AddOption(&visualization, "-vis", "--visualization",
                   "-no-vis", "--no-visualization",
                   "Enable or disable visualization (accepted for consistency).");
-   args.AddOption(&exact_smoother, "-exact-smoother", "--exact-smoother",
-                  "-patch-smoother", "--patch-smoother",
-                  "Use exact solves on all multigrid levels.");
-   args.AddOption(&patch_only, "-patch-only", "--patch-only",
-                  "-multigrid", "--multigrid",
-                  "Use the vertex-patch smoother directly as a preconditioner.");
    args.AddOption(&random_rhs, "-random-rhs", "--random-rhs",
                   "-constant-rhs", "--constant-rhs",
                   "Use a reproducible random algebraic right-hand side.");
+   args.AddOption(&use_aw, "-aw", "--arnold-winther", "-jm", "--johnson-mercier",
+                  "Use Arnold--Winther or Johnson--Mercier elements.");
+   args.AddOption(&use_hz, "-hz", "--hu-zhang", "-no-hz", "--no-hu-zhang",
+                  "Use cubic Hu--Zhang stress elements (overrides -aw/-jm).");
+   args.AddOption(&use_hzzz, "-hzzz", "--huang-zhang-zhou-zhu",
+                  "-no-hzzz", "--no-huang-zhang-zhou-zhu",
+                  "Use 21-DOF HZZZ stress elements (overrides -hz/-aw/-jm).");
    args.ParseCheck();
 
    Mesh *mesh = new Mesh(mesh_file, 1, 1);
    MFEM_VERIFY(mesh->Dimension() == 2, "");
 
-   JohnsonMercierFECollection fec;
-   FiniteElementSpace *coarse_fespace = new FiniteElementSpace(mesh, &fec);
-   FiniteElementSpaceHierarchy fespaces(mesh, coarse_fespace, true, true);
+   const char *fec_name = use_hzzz ? "HZZZ_2D_P3" :
+                          (use_hz ? "HZ_2D_P3" :
+                           (use_aw ? "AW_2D_P3" : "JM_2D_P1"));
+   unique_ptr<FiniteElementCollection> fec(FiniteElementCollection::New(fec_name));
+   FiniteElementSpace *coarse_fespace = new FiniteElementSpace(mesh, fec.get());
+   FiniteElementSpaceHierarchy fes_hierarchy(mesh, coarse_fespace, true, true);
    for (int level = 0; level < geometric_refinements; level++)
-   { fespaces.AddUniformlyRefinedLevel(); }
+   {
+      fes_hierarchy.AddUniformlyRefinedLevel(
+         1, Ordering::byVDIM, Operator::MFEM_SPARSEMAT);
+   }
 
    cout << "\nGeometric multigrid hierarchy:\n";
-   for (int level = 0; level < fespaces.GetNumLevels(); level++)
+   for (int level = 0; level < fes_hierarchy.GetNumLevels(); level++)
    {
-      const FiniteElementSpace &fespace = fespaces.GetFESpaceAtLevel(level);
+      const FiniteElementSpace &fespace = fes_hierarchy.GetFESpaceAtLevel(level);
       cout << "  level " << level << ": " << fespace.GetNE()
            << " elements, " << fespace.GetTrueVSize() << " unknowns\n";
    }
-   FiniteElementSpace &fine_fespace = fespaces.GetFinestFESpace();
+   FiniteElementSpace &fine_fespace = fes_hierarchy.GetFinestFESpace();
    DenseMatrix identity(2); identity = 0.0; identity(0,0) = identity(1,1) = 1.0;
    MatrixConstantCoefficient rhs(identity);
    LinearForm b(&fine_fespace);
    b.AddDomainIntegrator(new MatrixFEDomainLFIntegrator(rhs)); b.Assemble();
-   GridFunction solution(&fine_fespace); solution = 0.0;
+   GridFunction solution(&fine_fespace);
+   solution = 0.0;
    Array<int> ess_bdr;
-   JohnsonMercierMultigrid multigrid(fespaces, ess_bdr, exact_smoother);
+   SymmetricMatrixMultigrid multigrid(fes_hierarchy, ess_bdr);
    multigrid.SetCycleType(Multigrid::CycleType::VCYCLE, 1, 1);
-   // multigrid.SetCycleType(Multigrid::CycleType::WCYCLE, 1, 1);
    OperatorHandle A; Vector B, X;
    multigrid.FormFineLinearSystem(solution, b, A, X, B);
    if (random_rhs) { B.Randomize(1); }
+
    CGSolver solver;
    solver.SetOperator(*A);
-   VertexPatchSmoother patch_smoother(*A.As<SparseMatrix>(), fine_fespace);
-   if (patch_only) { solver.SetPreconditioner(patch_smoother); }
-   else { solver.SetPreconditioner(multigrid); }
-   solver.SetRelTol(1e-10); solver.SetAbsTol(0.0); solver.SetMaxIter(500);
-   solver.SetPrintLevel(0); solver.Mult(B, X);
-   multigrid.RecoverFineFEMSolution(X, b, solution);
+   solver.SetPreconditioner(multigrid);
+   solver.SetRelTol(1e-10);
+   solver.SetAbsTol(0.0);
+   solver.SetMaxIter(500);
+   solver.SetPrintLevel(1);
+   solver.Mult(B, X);
+
    cout << "PCG iterations: " << solver.GetNumIterations() << '\n'
         << "Final residual norm: " << solver.GetFinalNorm() << '\n';
-   if (!solver.GetConverged()) { cerr << "PCG did not converge.\n"; return 3; }
+   if (!solver.GetConverged()) { cerr << "PCG did not converge.\n"; }
+
    return 0;
 }

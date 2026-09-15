@@ -59,6 +59,9 @@ public:
    void GetMomentToSplitVertexMatrix(ElementTransformation &Trans,
                                      DenseMatrix &change) const;
 
+   IntegrationPartition GetIntegrationPartition() const override
+   { return IntegrationPartition::ALFELD; }
+
    void CalcMShape(const IntegrationPoint &ip,
                    DenseTensor &shape) const override;
    void CalcMShape(ElementTransformation &Trans,
@@ -80,11 +83,13 @@ public:
                           ElementTransformation &Trans,
                           DenseMatrix &I) const override;
 
+   bool RequiresPhysicalTransfer() const override { return true; }
+
    /// Convert reference-child interpolation to the physical moment bases.
    void GetPhysicalTransferMatrix(const DenseMatrix &reference_transfer,
                                   ElementTransformation &child,
                                   ElementTransformation &fine,
-                                  DenseMatrix &I) const;
+                                  DenseMatrix &I) const override;
 
    void GetLocalInterpolation(ElementTransformation &Trans,
                               DenseMatrix &I) const override

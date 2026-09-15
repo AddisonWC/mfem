@@ -16,6 +16,24 @@ private:
    mutable Vector patch_rhs, patch_solution;
 
 public:
+   // Construct from explicit patch dofs, e.g. complete distributed vertex stars.
+   VertexPatchSmoother(const SparseMatrix &op, const Table &patches)
+      : Solver(op.Height())
+   {
+      for (int patch = 0; patch < patches.Size(); patch++)
+      {
+         Array<int> *dofs = new Array<int>;
+         patches.GetRow(patch, *dofs);
+         DenseMatrix patch_matrix(dofs->Size());
+         op.GetSubMatrix(*dofs, *dofs, patch_matrix);
+         DenseMatrix *patch_inverse = new DenseMatrix;
+         DenseMatrixInverse inverse(patch_matrix, true);
+         inverse.GetInverseMatrix(*patch_inverse);
+         patch_dofs.Append(dofs);
+         patch_inverses.Append(patch_inverse);
+      }
+   }
+
    VertexPatchSmoother(const SparseMatrix &op, FiniteElementSpace &fespace)
       : Solver(op.Height())
    {
@@ -28,6 +46,13 @@ public:
       for (int vertex = 0; vertex < mesh->GetNV(); vertex++)
       {
          Array<int> *dofs = new Array<int>;
+         fespace.GetVertexDofs(vertex, dofs_on_entity);
+         for (int dof : dofs_on_entity)
+         {
+            const int index = UnsignIndex(dof);
+            marker[index] = vertex;
+            dofs->Append(index);
+         }
          const int *incident_elements = vertex_to_element->GetRow(vertex);
          const int num_incident_elements = vertex_to_element->RowSize(vertex);
          for (int i = 0; i < num_incident_elements; i++)
@@ -49,7 +74,7 @@ public:
                const int edge = element_edges[j];
                mesh->GetEdgeVertices(edge, edge_vertices);
                if (edge_vertices.Find(vertex) < 0) { continue; }
-               fespace.GetEdgeDofs(edge, dofs_on_entity);
+               fespace.GetEdgeInteriorDofs(edge, dofs_on_entity);
                for (int k = 0; k < dofs_on_entity.Size(); k++)
                {
                   const int dof = UnsignIndex(dofs_on_entity[k]);
