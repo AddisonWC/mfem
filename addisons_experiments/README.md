@@ -42,13 +42,15 @@ OPENBLAS_NUM_THREADS=1 ./mg_compare -r 3 > mg.csv
 - `johnson_mercier/tests/`: experiment validation, run only by this project.
 - [HX report](johnson_mercier/reports/hx_compare.md) and
   [multigrid report](johnson_mercier/reports/mg_compare.md).
-- `johnson_mercier/results/`: selected historical CSV snapshots.
+- `johnson_mercier/results/`: selected CSV snapshots, including the updated HCT-Jacobi multigrid runs.
 
-The reports and CSVs were moved from `examples/`; the CSV contents are unchanged.
+The original reports and CSVs were moved from `examples/`; the historical CSVs
+remain unchanged. The multigrid report now also records the split-patch plus
+HCT-Jacobi smoother, with new measurements in `mg_hct_results.csv`.
 HX materials came from commit `3f34c7b398`, and multigrid materials from
 `81fce13057`. These identify the commits that recorded the results, not necessarily
-the exact revisions used to run them. Existing reports retain their measurements
-and limitations; this reorganization does not regenerate benchmark results.
+the exact revisions used to run them. The HX report retains its historical measurements and limitations. See the
+multigrid report for reproduction commands and provenance of the new runs.
 
 For future snapshots, record the source revision (and uncommitted changes), exact
 commands, compiler/build settings, solver backend, hardware, and thread count.

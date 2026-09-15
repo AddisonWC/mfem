@@ -236,6 +236,41 @@ public:
    void MultTranspose(const Vector &x, Vector &y) const override { Mult(x, y); }
 };
 
+/// Jacobi on the one-dimensional Airy images of the full HCT basis.
+/// The affine kernel needs no gauge: no singular potential matrix is inverted.
+class AiryJacobi : public Solver
+{
+   HCT_FECollection fec;
+   FiniteElementSpace potential;
+   DiscreteLinearOperator airy;
+   Vector diagonal;
+   mutable Vector rhs;
+public:
+   explicit AiryJacobi(FiniteElementSpace &moments)
+      : Solver(moments.GetVSize()), potential(moments.GetMesh(), &fec),
+        airy(&potential, &moments), rhs(potential.GetVSize())
+   {
+      airy.AddDomainInterpolator(new AiryInterpolator);
+      airy.Assemble(); airy.Finalize();
+      // div(C phi)=0, so C^T (M + div^T div) C is the Hessian form.
+      // Assemble this directly to avoid cancellation in the div-div term.
+      BilinearForm energy(&potential);
+      energy.AddDomainIntegrator(new HessianIntegrator);
+      energy.Assemble(); energy.Finalize();
+      energy.SpMat().GetDiag(diagonal);
+      for (int i = 0; i < diagonal.Size(); i++)
+      { MFEM_VERIFY(diagonal(i) > 0, "zero-energy HCT basis image"); }
+   }
+   void Mult(const Vector &x, Vector &y) const override
+   {
+      airy.MultTranspose(x, rhs);
+      for (int i = 0; i < rhs.Size(); i++) { rhs(i) /= diagonal(i); }
+      airy.Mult(rhs, y);
+   }
+   void MultTranspose(const Vector &x, Vector &y) const override { Mult(x, y); }
+   void SetOperator(const Operator &) override { MFEM_ABORT("fixed Airy Jacobi"); }
+};
+
 class ExactSolver : public Solver
 {
 #ifdef MFEM_USE_SUITESPARSE

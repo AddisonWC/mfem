@@ -147,13 +147,18 @@ TEST_CASE("JM multigrid patches preserve moment prolongation", "[JohnsonMercier]
    class Scaled : public Solver
    {
       const Solver &R;
+      real_t weight;
    public:
-      Scaled(const Solver &r) : Solver(r.Height()), R(r) { }
+      Scaled(const Solver &r, real_t w = 0.33) : Solver(r.Height()), R(r), weight(w) { }
       void Mult(const Vector &x, Vector &y) const override
-      { R.Mult(x, y); y *= 0.33; }
+      { R.Mult(x, y); y *= weight; }
       void MultTranspose(const Vector &x, Vector &y) const override { Mult(x, y); }
       void SetOperator(const Operator &) override { MFEM_ABORT("fixed"); }
    } sm(macro), sv(mapped_macro), ss(mapped_split);
+   AiryJacobi airy_jacobi(fine);
+   // Use the same two-term weighting as the driver defaults.
+   Scaled airy_scaled(airy_jacobi, 0.05);
+   HX combined(mapped_split, airy_scaled, 0.33);
    Array<Operator *> ops, transfers;
    ops.Append(&ac.SpMat()); ops.Append(&af.SpMat());
    transfers.Append(hierarchy.GetProlongationAtLevel(0));
@@ -163,9 +168,10 @@ TEST_CASE("JM multigrid patches preserve moment prolongation", "[JohnsonMercier]
    transfers[0]->Mult(c, before);
    Vector rhs(fine.GetVSize()), ym(rhs.Size()), yv(rhs.Size()), ys(rhs.Size());
    for (int i = 0; i < rhs.Size(); i++) { rhs(i) = std::sin(i+0.7); }
-   Solver *variants[] = {&sm, &sv, &ss};
-   Vector *answers[] = {&ym, &yv, &ys};
-   for (int k = 0; k < 3; k++)
+   Vector yh(rhs.Size());
+   Solver *variants[] = {&sm, &sv, &ss, &combined};
+   Vector *answers[] = {&ym, &yv, &ys, &yh};
+   for (int k = 0; k < 4; k++)
    {
       Array<Solver *> smoothers; smoothers.Append(&inverse); smoothers.Append(variants[k]);
       Multigrid mg(ops, smoothers, transfers, own_ops, own_ops, own_transfers);
@@ -177,10 +183,44 @@ TEST_CASE("JM multigrid patches preserve moment prolongation", "[JohnsonMercier]
       REQUIRE(std::abs(before * *answers[k] - rhs*z) <
               1e-10*before.Norml2()*answers[k]->Norml2());
    }
+   yh -= ys;
+   REQUIRE(yh.Norml2() > 1e-5*ys.Norml2());
    yv -= ym;
    REQUIRE(yv.Norml2() < 1e-10*ym.Norml2());
    ys -= ym;
    REQUIRE(ys.Norml2() > 1e-5*ym.Norml2());
    transfers[0]->Mult(c, after); after -= before;
    REQUIRE(after.Norml2() == 0.0);
+}
+
+TEST_CASE("HCT image Jacobi matches energy-normalized Airy basis corrections",
+          "[JohnsonMercier][Multigrid]")
+{
+   Mesh mesh = Mesh::MakeCartesian2D(2, 2, Element::TRIANGLE, true);
+   JohnsonMercierFECollection jm;
+   HCT_FECollection hct;
+   FiniteElementSpace stress(&mesh, &jm), potential(&mesh, &hct);
+   DiscreteLinearOperator C(&potential, &stress);
+   C.AddDomainInterpolator(new AiryInterpolator);
+   C.Assemble(); C.Finalize();
+   BilinearForm A(&stress), div(&stress);
+   A.AddDomainIntegrator(new MatrixFEMassIntegrator);
+   A.AddDomainIntegrator(new MatrixDivDivIntegrator);
+   div.AddDomainIntegrator(new MatrixDivDivIntegrator);
+   A.Assemble(); A.Finalize(); div.Assemble(); div.Finalize();
+   AiryJacobi smoother(stress);
+   Vector rhs(stress.GetVSize()), actual(rhs.Size()), expected(rhs.Size());
+   rhs.Randomize(7); expected = 0.0;
+   Vector e(potential.GetVSize()), image(rhs.Size()), action(rhs.Size());
+   for (int i = 0; i < e.Size(); i++)
+   {
+      e = 0.0; e(i) = 1.0; C.Mult(e, image);
+      A.Mult(image, action);
+      expected.Add((image*rhs)/(image*action), image);
+      div.Mult(image, action);
+      REQUIRE(action.Norml2() < 1e-9*image.Norml2());
+   }
+   smoother.Mult(rhs, actual);
+   actual -= expected;
+   REQUIRE(actual.Norml2() < 1e-10*expected.Norml2());
 }
