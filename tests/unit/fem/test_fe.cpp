@@ -588,9 +588,12 @@ TEST_CASE("Brezzi-Douglas-Marini Finite Element Collection",
       {
          CAPTURE(dim, p, basis);
          BDM_FECollection fec(p, dim, basis);
+         const FiniteElementCollection *base_fec = &fec;
+         REQUIRE(dynamic_cast<const RT_FECollection *>(base_fec) == nullptr);
          REQUIRE(fec.GetOrder() == p);
          REQUIRE(fec.GetConstructorOrder() == p);
          REQUIRE(fec.GetContType() == FiniteElementCollection::NORMAL);
+         REQUIRE(fec.GetOpenBasisType() == basis);
          REQUIRE(fec.DofForGeometry(dim == 2 ? Geometry::SEGMENT :
                                     Geometry::TRIANGLE) ==
                  (dim == 2 ? p + 1 : (p + 1)*(p + 2)/2));
@@ -600,6 +603,12 @@ TEST_CASE("Brezzi-Douglas-Marini Finite Element Collection",
          REQUIRE(fec.FiniteElementForGeometry(volume) != nullptr);
          REQUIRE(fec.FiniteElementForGeometry(dim == 2 ? Geometry::SQUARE :
                                               Geometry::CUBE) == nullptr);
+         if (dim == 3)
+         {
+            REQUIRE(fec.FiniteElementForGeometry(Geometry::SQUARE) == nullptr);
+            REQUIRE(fec.DofForGeometry(Geometry::SQUARE) == 0);
+            REQUIRE(fec.DofOrderForOrientation(Geometry::SQUARE, 0) == nullptr);
+         }
 
          std::unique_ptr<FiniteElementCollection> copy(
             FiniteElementCollection::New(fec.Name()));

@@ -15,6 +15,7 @@
 #include "../config/config.hpp"
 #include "geom.hpp"
 #include "fe.hpp"
+#include <memory>
 
 namespace mfem
 {
@@ -449,13 +450,14 @@ protected:
 
    // Initialize only the face elements
    void InitFaces(const int p, const int dim, const int map_type,
-                  const bool signs);
+                  const bool signs, const bool simplex_only = false);
 
-   // Initialize face elements for trace, interface, and BDM collections.
+   // Constructor used by the constructor of the RT_Trace_FECollection and
+   // DG_Interface_FECollection classes
    RT_FECollection(const int p, const int dim, const int map_type,
                    const bool signs,
                    const int ob_type = BasisType::GaussLegendre,
-                   const int collection_order = -1);
+                   const bool simplex_only = false);
 
 public:
    /// Construct an H(div)-conforming Raviart-Thomas FE collection, RT_p.
@@ -503,8 +505,14 @@ public:
     The degrees of freedom are point evaluations, as in the simplex RT
     elements. Project() performs nodal interpolation, not canonical BDM
     moment interpolation. */
-class BDM_FECollection : public RT_FECollection
+class BDM_FECollection : public FiniteElementCollection
 {
+   int dim;
+   int ob_type;
+   char bdm_name[32];
+   std::unique_ptr<FiniteElementCollection> face_fec;
+   std::unique_ptr<FiniteElement> volume_fe;
+
 public:
    /** @brief Construct the simplex BDM collection of polynomial degree @a p.
        @param[in] ob_type Open nodal basis for the normal facet samples.
@@ -512,12 +520,22 @@ public:
    BDM_FECollection(const int p, const int dim,
                     const int ob_type = BasisType::GaussLegendre);
 
+   const FiniteElement *FiniteElementForGeometry(
+      Geometry::Type geom) const override;
+   int DofForGeometry(Geometry::Type geom) const override;
+   const int *DofOrderForOrientation(Geometry::Type geom,
+                                     int Or) const override;
+   const char *Name() const override { return bdm_name; }
+   int GetContType() const override { return NORMAL; }
+
    FiniteElementCollection *GetTraceCollection() const override;
 
    FiniteElementCollection *Clone(int p) const override
    { return new BDM_FECollection(p, dim, ob_type); }
 
    int GetConstructorOrder() const override { return base_p; }
+   int GetOpenBasisType() const { return ob_type; }
+
 };
 
 /** @brief Arbitrary order "H^{-1/2}-conforming" face finite elements defined on
