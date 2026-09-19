@@ -11,6 +11,10 @@
 Version 4.10.1 (development)
 ============================
 
+- Added arbitrary-order nodal Brezzi-Douglas-Marini elements on triangles and
+  tetrahedra through BDM_FECollection, with normal traces and interpolation
+  using the existing H(div) infrastructure.
+
 
 Version 4.10, released on Sep 1, 2026
 =====================================

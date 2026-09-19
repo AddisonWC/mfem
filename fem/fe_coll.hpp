@@ -137,6 +137,8 @@ public:
    | RT_R1D@[CBTYPE][OBTYPE]_[DIM]_[ORDER] | H(div) | * | * / * | H_DIV | 3D H(div)-conforming Raviart-Thomas vector elements in 1D. |
    | RT_R2D_[DIM]_[ORDER] | H(div) | * | 1 / 0 | H_DIV | 3D H(div)-conforming Raviart-Thomas vector elements in 2D. |
    | RT_R2D@[CBTYPE][OBTYPE]_[DIM]_[ORDER] | H(div) | * | * / * | H_DIV | 3D H(div)-conforming Raviart-Thomas vector elements in 2D. |
+   | BDM_[DIM]_[ORDER] | H(div) | * | 0 | H_DIV | Brezzi-Douglas-Marini vector elements on simplices |
+   | BDM@[BTYPE]_[DIM]_[ORDER] | H(div) | * | * | H_DIV | Brezzi-Douglas-Marini vector elements on simplices |
    | HCT_2D_P3 | H2 | 3 | - | VALUE | Cubic Hsieh--Clough--Tocher macroelements on triangles |
    | ReducedHCT_2D_P3 | H2 | 3 | - | VALUE | Reduced cubic Hsieh--Clough--Tocher macroelements on triangles |
    | Bell_2D_P5 | H2 | 5 | - | VALUE | Quintic Bell elements on triangles |
@@ -449,11 +451,11 @@ protected:
    void InitFaces(const int p, const int dim, const int map_type,
                   const bool signs);
 
-   // Constructor used by the constructor of the RT_Trace_FECollection and
-   // DG_Interface_FECollection classes
+   // Initialize face elements for trace, interface, and BDM collections.
    RT_FECollection(const int p, const int dim, const int map_type,
                    const bool signs,
-                   const int ob_type = BasisType::GaussLegendre);
+                   const int ob_type = BasisType::GaussLegendre,
+                   const int collection_order = -1);
 
 public:
    /// Construct an H(div)-conforming Raviart-Thomas FE collection, RT_p.
@@ -491,6 +493,31 @@ public:
    { return base_p-1; }
 
    virtual ~RT_FECollection();
+};
+
+/// Arbitrary order H(div)-conforming Brezzi-Douglas-Marini elements.
+/** This collection defines BDM_p = [P_p]^dim on simplices for p >= 1.
+    Consequently, it provides elements for triangles in 2D and tetrahedra in
+    3D; BDM is not defined here on tensor-product or mixed geometries.
+
+    The degrees of freedom are point evaluations, as in the simplex RT
+    elements. Project() performs nodal interpolation, not canonical BDM
+    moment interpolation. */
+class BDM_FECollection : public RT_FECollection
+{
+public:
+   /** @brief Construct the simplex BDM collection of polynomial degree @a p.
+       @param[in] ob_type Open nodal basis for the normal facet samples.
+       Cell-local samples use the default Gauss-Legendre points. */
+   BDM_FECollection(const int p, const int dim,
+                    const int ob_type = BasisType::GaussLegendre);
+
+   FiniteElementCollection *GetTraceCollection() const override;
+
+   FiniteElementCollection *Clone(int p) const override
+   { return new BDM_FECollection(p, dim, ob_type); }
+
+   int GetConstructorOrder() const override { return base_p; }
 };
 
 /** @brief Arbitrary order "H^{-1/2}-conforming" face finite elements defined on

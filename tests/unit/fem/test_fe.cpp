@@ -543,6 +543,88 @@ TEST_CASE("Raviart-Thomas Hexahedron Finite Element",
    }
 }
 
+TEST_CASE("Brezzi-Douglas-Marini Simplex Finite Elements",
+          "[BDM]"
+          "[BDM_TriangleElement]"
+          "[BDM_TetrahedronElement]"
+          "[VectorFiniteElement]"
+          "[FiniteElement]")
+{
+   for (int p = 1; p <= 4; p++)
+   {
+      BDM_TriangleElement tri(p);
+      BDM_TetrahedronElement tet(p);
+
+      REQUIRE(tri.GetDim() == 2);
+      REQUIRE(tri.GetGeomType() == Geometry::TRIANGLE);
+      REQUIRE(tri.Space() == (int) FunctionSpace::Pk);
+      REQUIRE(tri.GetRangeType() == (int) FiniteElement::VECTOR);
+      REQUIRE(tri.GetMapType() == (int) FiniteElement::H_DIV);
+      REQUIRE(tri.GetDerivType() == (int) FiniteElement::DIV);
+      REQUIRE(tri.GetDof() == (p + 1)*(p + 2));
+      REQUIRE(tri.GetOrder() == p);
+
+      REQUIRE(tet.GetDim() == 3);
+      REQUIRE(tet.GetGeomType() == Geometry::TETRAHEDRON);
+      REQUIRE(tet.Space() == (int) FunctionSpace::Pk);
+      REQUIRE(tet.GetRangeType() == (int) FiniteElement::VECTOR);
+      REQUIRE(tet.GetMapType() == (int) FiniteElement::H_DIV);
+      REQUIRE(tet.GetDerivType() == (int) FiniteElement::DIV);
+      REQUIRE(tet.GetDof() == (p + 1)*(p + 2)*(p + 3)/2);
+      REQUIRE(tet.GetOrder() == p);
+   }
+}
+
+TEST_CASE("Brezzi-Douglas-Marini Finite Element Collection",
+          "[BDM]"
+          "[BDM_FECollection]"
+          "[FiniteElementCollection]")
+{
+   const int basis = GENERATE(BasisType::GaussLegendre, BasisType::OpenUniform,
+                              BasisType::OpenHalfUniform);
+   for (int dim = 2; dim <= 3; dim++)
+   {
+      for (int p = 1; p <= 4; p++)
+      {
+         CAPTURE(dim, p, basis);
+         BDM_FECollection fec(p, dim, basis);
+         REQUIRE(fec.GetOrder() == p);
+         REQUIRE(fec.GetConstructorOrder() == p);
+         REQUIRE(fec.GetContType() == FiniteElementCollection::NORMAL);
+         REQUIRE(fec.DofForGeometry(dim == 2 ? Geometry::SEGMENT :
+                                    Geometry::TRIANGLE) ==
+                 (dim == 2 ? p + 1 : (p + 1)*(p + 2)/2));
+
+         const Geometry::Type volume = dim == 2 ? Geometry::TRIANGLE :
+                                       Geometry::TETRAHEDRON;
+         REQUIRE(fec.FiniteElementForGeometry(volume) != nullptr);
+         REQUIRE(fec.FiniteElementForGeometry(dim == 2 ? Geometry::SQUARE :
+                                              Geometry::CUBE) == nullptr);
+
+         std::unique_ptr<FiniteElementCollection> copy(
+            FiniteElementCollection::New(fec.Name()));
+         REQUIRE(copy != nullptr);
+         REQUIRE(std::string(copy->Name()) == fec.Name());
+         std::unique_ptr<FiniteElementCollection> higher(fec.Clone(p+1));
+         REQUIRE(higher->GetOrder() == p+1);
+         REQUIRE(higher->GetConstructorOrder() == p+1);
+         REQUIRE(higher->FiniteElementForGeometry(volume)->GetOrder() == p+1);
+         REQUIRE(dynamic_cast<BDM_FECollection *>(higher.get()) != nullptr);
+
+         Mesh mesh = dim == 2 ?
+                     Mesh::MakeCartesian2D(2, 2, Element::TRIANGLE, true) :
+                     Mesh::MakeCartesian3D(1, 1, 1, Element::TETRAHEDRON);
+         FiniteElementSpace fespace(&mesh, &fec);
+         const int entity_dofs = dim == 2 ? p + 1 : (p + 1)*(p + 2)/2;
+         const int interior_dofs = dim == 2 ? (p + 1)*(p - 1) :
+                                   (p + 1)*(p + 2)*(p - 1)/2;
+         const int entities = dim == 2 ? mesh.GetNEdges() : mesh.GetNFaces();
+         REQUIRE(fespace.GetVSize() ==
+                 entities*entity_dofs + mesh.GetNE()*interior_dofs);
+      }
+   }
+}
+
 TEST_CASE("L2 Segment Finite Element",
           "[L2_SegmentElement]"
           "[NodalFiniteElement]"

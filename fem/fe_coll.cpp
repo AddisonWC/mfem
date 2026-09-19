@@ -394,6 +394,15 @@ FiniteElementCollection *FiniteElementCollection::New(const char *name)
                                     BasisType::GetType(name[7]),
                                     BasisType::GetType(name[8]));
    }
+   else if (!strncmp(name, "BDM_", 4))
+   {
+      fec = new BDM_FECollection(atoi(name + 8), atoi(name + 4));
+   }
+   else if (!strncmp(name, "BDM@", 4))
+   {
+      fec = new BDM_FECollection(atoi(name + 10), atoi(name + 6),
+                                 BasisType::GetType(name[4]));
+   }
    else if (!strncmp(name, "RT_", 3))
    {
       fec = new RT_FECollection(atoi(name + 7), atoi(name + 3));
@@ -2882,12 +2891,12 @@ RT_FECollection::RT_FECollection(const int order, const int dim,
    }
 }
 
-// This is a special protected constructor only used by RT_Trace_FECollection
-// and DG_Interface_FECollection
+// Initialize face elements for trace, interface, and BDM collections.
 RT_FECollection::RT_FECollection(const int p, const int dim,
                                  const int map_type, const bool signs,
-                                 const int ob_type)
-   : FiniteElementCollection(p + 1)
+                                 const int ob_type,
+                                 const int collection_order)
+   : FiniteElementCollection(collection_order >= 0 ? collection_order : p + 1)
    , dim(dim)
    , ob_type(ob_type)
 {
@@ -2898,6 +2907,45 @@ RT_FECollection::RT_FECollection(const int p, const int dim,
       MFEM_ABORT("Invalid open basis type: " << ob_name);
    }
    InitFaces(p, dim, map_type, signs);
+}
+
+BDM_FECollection::BDM_FECollection(const int p, const int dim,
+                                   const int ob_type)
+   : RT_FECollection(p, dim, FiniteElement::INTEGRAL, true,
+                     BasisType::CheckNodal(ob_type), p)
+{
+   MFEM_VERIFY(p >= 1, "BDM_FECollection requires order >= 1.");
+   MFEM_VERIFY(dim == 2 || dim == 3,
+               "BDM_FECollection requires dimension 2 or 3.");
+   cb_type = BasisType::GaussLobatto; // unused by simplex BDM elements
+
+   if (ob_type == BasisType::GaussLegendre)
+   {
+      snprintf(rt_name, 32, "BDM_%dD_P%d", dim, p);
+   }
+   else
+   {
+      snprintf(rt_name, 32, "BDM@%c_%dD_P%d",
+               (int)BasisType::GetChar(ob_type), dim, p);
+   }
+
+   if (dim == 2)
+   {
+      RT_Elements[Geometry::TRIANGLE] = new BDM_TriangleElement(p, ob_type);
+      RT_dof[Geometry::TRIANGLE] = (p + 1)*(p - 1);
+   }
+   else
+   {
+      RT_Elements[Geometry::TETRAHEDRON] =
+         new BDM_TetrahedronElement(p, ob_type);
+      RT_dof[Geometry::TETRAHEDRON] = (p + 1)*(p + 2)*(p - 1)/2;
+   }
+}
+
+FiniteElementCollection *BDM_FECollection::GetTraceCollection() const
+{
+   return new RT_Trace_FECollection(base_p, dim, FiniteElement::INTEGRAL,
+                                    ob_type);
 }
 
 void RT_FECollection::InitFaces(const int p, const int dim_,
