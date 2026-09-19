@@ -43,6 +43,8 @@ OPENBLAS_NUM_THREADS=1 ./mg_compare -r 3 > mg.csv
 - [HX report](johnson_mercier/reports/hx_compare.md) and
   [multigrid report](johnson_mercier/reports/mg_compare.md).
 - `johnson_mercier/results/`: selected CSV snapshots, including the updated HCT-Jacobi multigrid runs.
+- [BDM1 HX decomposition plots](bdm_hx_decomposition/README.md): vertex-patch
+  optimal splits and Neumann Helmholtz comparisons on a 10×10 mesh.
 
 The original reports and CSVs were moved from `examples/`; the historical CSVs
 remain unchanged. The multigrid report now also records the split-patch plus

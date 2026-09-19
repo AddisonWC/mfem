@@ -1,0 +1,147 @@
+{
+  "mesh": "10x10 square cells, each split into two triangles",
+  "bdm_dimension": 640,
+  "p1_vector_dimension": 242,
+  "p2_scalar_dimension": 441,
+  "max_patch_value_at_other_vertices": 2.6645352591003757e-15,
+  "helmholtz_p2_mesh": 40,
+  "noisy_source": {
+    "seed": 20260919,
+    "smooth_h1_norm": 2.364857301617749,
+    "potential_h1_norm": 2.3648573016177488
+  },
+  "results": {
+    "compression_wave": {
+      "alpha_0.25": {
+        "reconstruction_l2_dof": 4.052048184129827e-13,
+        "smooth_h1_squared": 0.8941016629776302,
+        "potential_h1_squared": 0.2883802078828941,
+        "local_hdiv_squared": 5.139906068312484,
+        "weighted_total": 2.4674583879386467
+      },
+      "alpha_1": {
+        "reconstruction_l2_dof": 4.1499579991036854e-13,
+        "smooth_h1_squared": 2.789201555527968,
+        "potential_h1_squared": 0.3055855736001107,
+        "local_hdiv_squared": 1.224531219704635,
+        "weighted_total": 4.319318348832681
+      },
+      "alpha_4": {
+        "reconstruction_l2_dof": 5.387418980258222e-13,
+        "smooth_h1_squared": 4.656587766245696,
+        "potential_h1_squared": 0.3285793605608119,
+        "local_hdiv_squared": 0.15401801041986216,
+        "weighted_total": 5.60123916848606
+      },
+      "no_local": {
+        "reconstruction_l2_dof": 9.225876416367578e-13,
+        "smooth_h1_squared": 6.0213257941919895,
+        "potential_h1_squared": 0.3457376880505271,
+        "local_hdiv_squared": 0.0,
+        "weighted_total": 6.367063482242644
+      },
+      "helmholtz": {
+        "method": "P2 Neumann Galerkin approximation"
+      }
+    },
+    "shear_wave": {
+      "alpha_0.25": {
+        "reconstruction_l2_dof": 3.13874551278753e-14,
+        "smooth_h1_squared": 0.023461031836440726,
+        "potential_h1_squared": 0.17206561076149648,
+        "local_hdiv_squared": 0.045830602356088844,
+        "weighted_total": 0.20698429318695954
+      },
+      "alpha_1": {
+        "reconstruction_l2_dof": 3.2663196481908256e-14,
+        "smooth_h1_squared": 0.03167603316242828,
+        "potential_h1_squared": 0.18092893647843872,
+        "local_hdiv_squared": 0.00790387453744739,
+        "weighted_total": 0.2205088441783145
+      },
+      "alpha_4": {
+        "reconstruction_l2_dof": 6.259329474340581e-14,
+        "smooth_h1_squared": 0.03717384480926992,
+        "potential_h1_squared": 0.18684700148408698,
+        "local_hdiv_squared": 0.001291606462673149,
+        "weighted_total": 0.2291872721440495
+      },
+      "no_local": {
+        "reconstruction_l2_dof": 2.7642835368892043e-12,
+        "smooth_h1_squared": 0.13855679568235954,
+        "potential_h1_squared": 0.1890725019939545,
+        "local_hdiv_squared": 0.0,
+        "weighted_total": 0.3276292976742481
+      },
+      "helmholtz": {
+        "method": "P2 Neumann Galerkin approximation"
+      }
+    },
+    "localized_edge_pattern": {
+      "alpha_0.25": {
+        "reconstruction_l2_dof": 1.4114063762479157e-13,
+        "smooth_h1_squared": 0.10952651723301987,
+        "potential_h1_squared": 0.038885969934776284,
+        "local_hdiv_squared": 0.6300724780551835,
+        "weighted_total": 0.30593060668159233
+      },
+      "alpha_1": {
+        "reconstruction_l2_dof": 1.462513968651765e-13,
+        "smooth_h1_squared": 0.3416769769128378,
+        "potential_h1_squared": 0.041149115405121915,
+        "local_hdiv_squared": 0.15010341837536065,
+        "weighted_total": 0.5329295106933164
+      },
+      "alpha_4": {
+        "reconstruction_l2_dof": 1.8482408883187605e-13,
+        "smooth_h1_squared": 0.5704340222582357,
+        "potential_h1_squared": 0.04411638820323869,
+        "local_hdiv_squared": 0.018880152017302705,
+        "weighted_total": 0.690071018530698
+      },
+      "no_local": {
+        "reconstruction_l2_dof": 3.182225641994265e-13,
+        "smooth_h1_squared": 0.7376133765478035,
+        "potential_h1_squared": 0.046334805127709655,
+        "local_hdiv_squared": 0.0,
+        "weighted_total": 0.7839481816755282
+      },
+      "helmholtz": {
+        "method": "P2 Neumann Galerkin approximation"
+      }
+    },
+    "multiscale_noisy_potential": {
+      "alpha_0.25": {
+        "reconstruction_l2_dof": 2.9367090837023725e-13,
+        "smooth_h1_squared": 0.4636659614133255,
+        "potential_h1_squared": 4.311288967724075,
+        "local_hdiv_squared": 3.5414676301536763,
+        "weighted_total": 5.660321836675825
+      },
+      "alpha_1": {
+        "reconstruction_l2_dof": 3.036360221356097e-13,
+        "smooth_h1_squared": 1.393491272722521,
+        "potential_h1_squared": 4.664113726390431,
+        "local_hdiv_squared": 0.9318308054523844,
+        "weighted_total": 6.989435804565323
+      },
+      "alpha_4": {
+        "reconstruction_l2_dof": 3.905006386927979e-13,
+        "smooth_h1_squared": 2.3090955436345273,
+        "potential_h1_squared": 5.189182681912895,
+        "local_hdiv_squared": 0.12903430514066166,
+        "weighted_total": 8.014415446110121
+      },
+      "no_local": {
+        "reconstruction_l2_dof": 1.6137525511465783e-12,
+        "smooth_h1_squared": 2.965676493930052,
+        "potential_h1_squared": 5.746600153839825,
+        "local_hdiv_squared": 0.0,
+        "weighted_total": 8.712276647769002
+      },
+      "helmholtz": {
+        "method": "P2 Neumann Galerkin approximation"
+      }
+    }
+  }
+}

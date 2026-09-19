@@ -1,0 +1,98 @@
+{
+  "compression_wave": {
+    "source_hdiv_squared": 10.19135243030957,
+    "smooth_h1_squared": 6.0009196290073845,
+    "potential_h1_squared": 0.3453831670464903,
+    "local_hdiv_squared": 0.00045957339415345744,
+    "total_alpha_quarter": 6.346417689402413,
+    "total_alpha_one": 6.346762369448029,
+    "total_alpha_four": 6.348141089630489,
+    "reconstruction_l2_dof": 9.219722206193486e-13,
+    "commuting_l2_dof": 1.6609865099026432e-15,
+    "continuous_h1_product_squared": 6.352668003621094,
+    "continuous_s_h1_squared": 6.007285548765494,
+    "continuous_q_h1_squared": 0.34538245485560015,
+    "nodal_s_h1_squared_ratio": 0.9989403001228371,
+    "moment_q_h1_squared_ratio": 1.0000020620355208,
+    "moment_s_hdiv_squared_ratio": 1.627623629903029,
+    "polynomial_degree_convergence": {
+      "4": 6.367045899107188,
+      "6": 6.353659392800212,
+      "8": 6.352668003621094
+    },
+    "optimal_alpha_one_squared": 4.319318348832681,
+    "constructive_over_optimal_alpha_one": 1.4693898103535887
+  },
+  "shear_wave": {
+    "source_hdiv_squared": 0.26293866636696,
+    "smooth_h1_squared": 0.04057159691010195,
+    "potential_h1_squared": 0.1902505788542976,
+    "local_hdiv_squared": 0.0012691741730305544,
+    "total_alpha_quarter": 0.2311394693076572,
+    "total_alpha_one": 0.2320913499374301,
+    "total_alpha_four": 0.23589887245652177,
+    "reconstruction_l2_dof": 2.7642180899524623e-12,
+    "commuting_l2_dof": 1.83333883178488e-15,
+    "continuous_h1_product_squared": 0.23593894034517526,
+    "continuous_s_h1_squared": 0.04568727080828178,
+    "continuous_q_h1_squared": 0.1902516695368935,
+    "nodal_s_h1_squared_ratio": 0.8880284637783068,
+    "moment_q_h1_squared_ratio": 0.9999942671588715,
+    "moment_s_hdiv_squared_ratio": 0.8229467895649113,
+    "polynomial_degree_convergence": {
+      "4": 0.32195426929884685,
+      "6": 0.2407178951343205,
+      "8": 0.23593894034517526
+    },
+    "optimal_alpha_one_squared": 0.2205088441783145,
+    "constructive_over_optimal_alpha_one": 1.0525262639794593
+  },
+  "localized_edge_pattern": {
+    "source_hdiv_squared": 1.2524211401830267,
+    "smooth_h1_squared": 0.7351134379174283,
+    "potential_h1_squared": 0.04629167267507862,
+    "local_hdiv_squared": 5.625444134439311e-05,
+    "total_alpha_quarter": 0.781419174202843,
+    "total_alpha_one": 0.7814613650338513,
+    "total_alpha_four": 0.7816301283578845,
+    "reconstruction_l2_dof": 3.1818558669728034e-13,
+    "commuting_l2_dof": 5.841635762218757e-16,
+    "continuous_h1_product_squared": 0.7821853712569816,
+    "continuous_s_h1_squared": 0.7358933723771428,
+    "continuous_q_h1_squared": 0.046291998879838814,
+    "nodal_s_h1_squared_ratio": 0.9989401528957992,
+    "moment_q_h1_squared_ratio": 0.9999929533230776,
+    "moment_s_hdiv_squared_ratio": 1.6276216414139941,
+    "polynomial_degree_convergence": {
+      "4": 0.7839465222062764,
+      "6": 0.7823068394818461,
+      "8": 0.7821853712569816
+    },
+    "optimal_alpha_one_squared": 0.5329295106933164,
+    "constructive_over_optimal_alpha_one": 1.4663503321803415
+  },
+  "multiscale_noisy_potential": {
+    "source_hdiv_squared": 10.516314134369466,
+    "smooth_h1_squared": 2.9759309296785155,
+    "potential_h1_squared": 5.66731729813125,
+    "local_hdiv_squared": 0.002272786304806736,
+    "total_alpha_quarter": 8.643816424385967,
+    "total_alpha_one": 8.645521014114573,
+    "total_alpha_four": 8.652339373028992,
+    "reconstruction_l2_dof": 1.6118984399819616e-12,
+    "commuting_l2_dof": 2.3039148305176816e-15,
+    "continuous_h1_product_squared": 8.64778023198543,
+    "continuous_s_h1_squared": 2.980215138405487,
+    "continuous_q_h1_squared": 5.6675650935799435,
+    "nodal_s_h1_squared_ratio": 0.9985624498474082,
+    "moment_q_h1_squared_ratio": 0.9999562783233007,
+    "moment_s_hdiv_squared_ratio": 1.6088979472061828,
+    "polynomial_degree_convergence": {
+      "4": 8.702686569890671,
+      "6": 8.66027064029109,
+      "8": 8.64778023198543
+    },
+    "optimal_alpha_one_squared": 6.989435804565323,
+    "constructive_over_optimal_alpha_one": 1.2369411860779287
+  }
+}

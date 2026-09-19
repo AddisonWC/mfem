@@ -1,0 +1,58 @@
+{
+  "compression_wave": {
+    "source_hdiv_squared": 10.19135243030957,
+    "smooth_h1_squared": 10.320284291452287,
+    "potential_h1_squared": 1.5942005285432454e-07,
+    "local_hdiv_squared": 0.0045438575342561386,
+    "total_alpha_quarter": 10.321420415255904,
+    "total_alpha_one": 10.324828308406596,
+    "total_alpha_four": 10.338459881009364,
+    "reconstruction_l2_dof": 9.228862263761549e-13,
+    "commuting_l2_dof": 2.864168893395769e-14,
+    "relative_helmholtz_fit_l2": 0.0037959781828313627,
+    "optimal_alpha_one_squared": 4.319318348832681,
+    "constructive_over_optimal_alpha_one": 2.3903837306173408
+  },
+  "shear_wave": {
+    "source_hdiv_squared": 0.26293866636696,
+    "smooth_h1_squared": 4.051050789197549,
+    "potential_h1_squared": 0.14649213652524473,
+    "local_hdiv_squared": 0.12049201618044802,
+    "total_alpha_quarter": 4.227665929767906,
+    "total_alpha_one": 4.3180349419032416,
+    "total_alpha_four": 4.6795109904445855,
+    "reconstruction_l2_dof": 2.7644306703437997e-12,
+    "commuting_l2_dof": 1.3074267261086388e-14,
+    "relative_helmholtz_fit_l2": 0.02666240544560721,
+    "optimal_alpha_one_squared": 0.2205088441783145,
+    "constructive_over_optimal_alpha_one": 19.582139473786647
+  },
+  "localized_edge_pattern": {
+    "source_hdiv_squared": 1.2524211401830267,
+    "smooth_h1_squared": 1.2642330467345697,
+    "potential_h1_squared": 0.003982770822782467,
+    "local_hdiv_squared": 0.0005557582941815236,
+    "total_alpha_quarter": 1.2683547571308975,
+    "total_alpha_one": 1.2687715758515337,
+    "total_alpha_four": 1.2704388507340783,
+    "reconstruction_l2_dof": 3.176400103126914e-13,
+    "commuting_l2_dof": 1.0726964015392697e-14,
+    "relative_helmholtz_fit_l2": 0.0038101728866928235,
+    "optimal_alpha_one_squared": 0.5329295106933164,
+    "constructive_over_optimal_alpha_one": 2.380749330621457
+  },
+  "multiscale_noisy_potential": {
+    "source_hdiv_squared": 10.516314134369466,
+    "smooth_h1_squared": 61.483847785544995,
+    "potential_h1_squared": 5.0937178063361275,
+    "local_hdiv_squared": 1.4810811662513836,
+    "total_alpha_quarter": 66.94783588344397,
+    "total_alpha_one": 68.05864675813251,
+    "total_alpha_four": 72.50189025688665,
+    "reconstruction_l2_dof": 1.6140619173379964e-12,
+    "commuting_l2_dof": 3.399830402495516e-14,
+    "relative_helmholtz_fit_l2": 0.39278017525197184,
+    "optimal_alpha_one_squared": 6.989435804565323,
+    "constructive_over_optimal_alpha_one": 9.737359160474487
+  }
+}
