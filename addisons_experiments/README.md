@@ -42,6 +42,8 @@ OPENBLAS_NUM_THREADS=1 ./mg_compare -r 3 > mg.csv
 - `johnson_mercier/tests/`: experiment validation, run only by this project.
 - [HX report](johnson_mercier/reports/hx_compare.md) and
   [multigrid report](johnson_mercier/reports/mg_compare.md).
+- [CG residual-stagnation investigation](johnson_mercier/reports/mg_stagnation.md):
+  diagnosis, solver cleanup, selected histories, and reproduction commands.
 - `johnson_mercier/results/`: selected CSV snapshots, including the updated HCT-Jacobi multigrid runs.
 - [BDM1 HX decomposition plots](bdm_hx_decomposition/README.md): vertex-patch
   optimal splits and Neumann Helmholtz comparisons on a 10×10 mesh.

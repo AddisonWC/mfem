@@ -1,5 +1,11 @@
 # Johnson–Mercier HX comparisons
 
+**Solver cleanup:** current runs use ordinary MFEM PCG followed by true-residual
+verification and up to three fresh correction solves. The `iterations` column
+now includes correction iterations. The historical data below used the former
+controller-based stopping rule; see the [residual investigation](mg_stagnation.md)
+for why it could stagnate and for the shared fix.
+
 These are historical measurements from before the directory reorganization.
 Program names and commands below use the current standalone layout; see the
 [README](../../README.md) for build instructions and provenance.

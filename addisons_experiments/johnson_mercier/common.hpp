@@ -12,6 +12,68 @@ namespace mfem
 namespace jm_hx
 {
 
+// Evaluate the residual of the stored double-precision matrix with extended
+// accumulation. This does not recover rounding lost during matrix assembly.
+inline void AccurateResidual(const SparseMatrix &A, const Vector &b,
+                             const Vector &x, Vector &r)
+{
+   const int *I = A.GetI(), *J = A.GetJ();
+   const real_t *data = A.GetData();
+   for (int i = 0; i < A.Height(); i++)
+   {
+      long double value = b(i);
+      for (int k = I[i]; k < I[i+1]; k++)
+      { value -= static_cast<long double>(data[k])*x(J[k]); }
+      r(i) = value;
+   }
+}
+
+struct PCGResult
+{
+   int iterations = 0;
+   int corrections = 0;
+   int correction_iterations = 0;
+};
+
+// A controller can observe or stop CG, but cannot refresh its internal residual.
+// Use normal PCG stopping and verify b-Ax outside the recurrence. A failed
+// verification starts a fresh correction solve, bounded by max_corrections.
+// The optional monitor observes the initial solve only.
+inline PCGResult VerifiedPCG(const SparseMatrix &A, Solver &preconditioner,
+                             const Vector &b, Vector &x, real_t tolerance,
+                             int max_iterations, int max_corrections = 3,
+                             IterativeSolverController *monitor = nullptr)
+{
+   PCGResult result;
+   CGSolver cg;
+   cg.SetOperator(A); cg.SetPreconditioner(preconditioner);
+   cg.SetRelTol(tolerance); cg.SetAbsTol(0);
+   cg.SetMaxIter(max_iterations); cg.SetPrintLevel(-1);
+   if (monitor) { cg.SetController(*monitor); }
+   x = 0.0;
+   cg.Mult(b, x);
+   result.iterations = cg.GetNumIterations();
+   Vector residual(b.Size()), delta(b.Size());
+   const real_t threshold = tolerance*b.Norml2();
+   for (int c = 0; c < max_corrections; c++)
+   {
+      A.Mult(x, residual); residual -= b;
+      if (residual.Norml2() <= threshold) { break; }
+      AccurateResidual(A, b, x, residual);
+      CGSolver inner;
+      inner.SetOperator(A); inner.SetPreconditioner(preconditioner);
+      inner.SetRelTol(0.01); inner.SetAbsTol(0);
+      inner.SetMaxIter(max_iterations); inner.SetPrintLevel(-1);
+      delta = 0.0;
+      inner.Mult(residual, delta);
+      x += delta;
+      result.corrections++;
+      result.correction_iterations += inner.GetNumIterations();
+   }
+   // Callers report success from the final true residual, not CG's flag.
+   return result;
+}
+
 // Split vertices retain the macro vertex numbers; center(T) = NV + T.
 inline std::unique_ptr<Mesh> AlfeldMesh(Mesh &macro)
 {

@@ -5,6 +5,29 @@
 using namespace mfem;
 using namespace mfem::jm_hx;
 
+TEST_CASE("Verified PCG corrects a failed true-residual check", "[JohnsonMercier][HX]")
+{
+   // The preconditioned residual hides the second component, so ordinary CG
+   // stops before the Euclidean residual meets the same relative tolerance.
+   SparseMatrix A(2), P(2);
+   A.Set(0, 0, 1.0); A.Set(1, 1, 100.0); A.Finalize();
+   P.Set(0, 0, 1.0); P.Set(1, 1, 1e4); P.Finalize();
+   DSmoother inverse(P);
+   Vector b(2), x(2), residual(2); b = 1.0;
+   const auto uncorrected = VerifiedPCG(A, inverse, b, x, 0.1, 2, 0);
+   A.Mult(x, residual); residual -= b;
+   REQUIRE(uncorrected.iterations == 1);
+   REQUIRE(uncorrected.corrections == 0);
+   REQUIRE(residual.Norml2() > 0.1*b.Norml2());
+
+   const auto corrected = VerifiedPCG(A, inverse, b, x, 0.1, 2, 3);
+   A.Mult(x, residual); residual -= b;
+   REQUIRE(corrected.corrections > 0);
+   REQUIRE(corrected.corrections <= 3);
+   REQUIRE(corrected.correction_iterations > 0);
+   REQUIRE(residual.Norml2() <= 0.1*b.Norml2());
+}
+
 TEST_CASE("JM HX coordinate maps and split H1 inclusion", "[JohnsonMercier][HX]")
 {
    Mesh mesh = Mesh::MakeCartesian2D(2, 2, Element::TRIANGLE, true);

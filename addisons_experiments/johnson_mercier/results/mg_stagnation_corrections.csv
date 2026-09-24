@@ -1,0 +1,4 @@
+refinement,elements,dofs,smoother,damping,airy_damping,steps,iterations,residual,converged,setup_s,solve_s,corrections,correction_iterations,extended_residual
+6,4096,37248,macro,0.33,0,1,29,5.77862914e-09,1,0.051797316,0.671647502,1,9,4.0598897e-09
+6,4096,37248,split,0.33,0.05,1,106,5.48750655e-09,1,0.334552951,2.35931941,3,97,3.77005511e-09
+7,16384,148224,split,0.33,0.05,1,110,4.43867538e-08,0,1.41748688,12.5285129,3,100,3.01932934e-08

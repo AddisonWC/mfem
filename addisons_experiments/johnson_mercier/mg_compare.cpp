@@ -5,6 +5,7 @@
 #include <chrono>
 #include <iomanip>
 #include <iostream>
+#include <fstream>
 #include <string>
 
 using namespace mfem;
@@ -24,26 +25,50 @@ public:
    void SetOperator(const Operator &) override { MFEM_ABORT("fixed smoother"); }
 };
 
-// Require the same actual moment-coordinate residual in every comparison.
+// Optional diagnostics only: never override CG stopping or modify its residual.
 class ResidualMonitor : public IterativeSolverController
 {
-   const Operator &A;
+   const SparseMatrix &A;
    const Vector &b;
-   real_t threshold;
    Vector residual;
+   Vector recursive;
+   std::ostream *history;
+   int depth;
+   std::string kind;
+   real_t rhs_norm;
+   real_t initial_preconditioned = 0.0, relative_preconditioned = 0.0;
 public:
-   ResidualMonitor(const Operator &op, const Vector &rhs, real_t tol)
-      : A(op), b(rhs), threshold(tol*rhs.Norml2()), residual(rhs.Size()) { }
-   void MonitorResidual(int, real_t, const Vector &r, bool) override
-   { converged = r.Norml2() <= threshold; }
-   bool RequiresUpdatedSolution() const override { return true; }
-   void MonitorSolution(int, real_t, const Vector &x, bool) override
+   ResidualMonitor(const SparseMatrix &op, const Vector &rhs,
+                   std::ostream *log, int level, const std::string &name)
+      : A(op), b(rhs), residual(rhs.Size()),
+        recursive(rhs.Size()), history(log), depth(level), kind(name),
+        rhs_norm(rhs.Norml2()) { }
+   void MonitorResidual(int it, real_t norm, const Vector &r, bool final) override
    {
-      if (converged)
+      if (history) { recursive = r; }
+      // CG passes r^T B r on non-final calls, but sqrt(r^T B r) on
+      // its final call. Only non-final values enter the history.
+      if (!final)
       {
-         A.Mult(x, residual); residual -= b;
-         converged = residual.Norml2() <= threshold;
+         if (it == 0) { initial_preconditioned = std::sqrt(norm); }
+         relative_preconditioned = initial_preconditioned > 0.0 ?
+                                  std::sqrt(norm)/initial_preconditioned : 0.0;
       }
+   }
+   bool RequiresUpdatedSolution() const override { return true; }
+   void MonitorSolution(int it, real_t, const Vector &x, bool final) override
+   {
+      if (!history || final) { return; }
+      A.Mult(x, residual); subtract(b, residual, residual);
+      const real_t true_norm = residual.Norml2();
+      residual -= recursive;
+      *history << depth << ',' << kind << ',' << it << ','
+               << recursive.Norml2()/rhs_norm << ','
+               << true_norm/rhs_norm << ','
+               << residual.Norml2()/rhs_norm << ',';
+      AccurateResidual(A, b, x, residual);
+      *history << residual.Norml2()/rhs_norm << ','
+               << relative_preconditioned << '\n';
    }
 };
 
@@ -68,7 +93,9 @@ int main(int argc, char *argv[])
 {
    const char *mesh_file = JM_DEFAULT_MESH;
    const char *choice_arg = "all";
+   const char *history_file = "";
    int refinements = 3, coarse_refinements = 0, steps = 1, max_it = 2000;
+   int corrections = 3;
    real_t airy_damping = 0.05;
    real_t damping = 0.33, tolerance = 1e-8;
    OptionsParser args(argc, argv);
@@ -80,14 +107,18 @@ int main(int argc, char *argv[])
    args.AddOption(&damping, "-damping", "--damping", "Patch weight (0 < weight < 0.5).");
    args.AddOption(&airy_damping, "-airy-damping", "--airy-damping",
                   "Airy Jacobi weight; split requires 4*damping + 12*airy-damping < 2.");
-   args.AddOption(&tolerance, "-tol", "--tolerance", "True relative residual tolerance.");
+   args.AddOption(&tolerance, "-tol", "--tolerance", "Relative tolerance for initial PCG and final true Euclidean residual.");
    args.AddOption(&max_it, "-max-it", "--max-iterations", "PCG iteration limit.");
+   args.AddOption(&history_file, "-history", "--history",
+                  "Optional CSV of recursive residual, true residual, and their gap at every iteration.");
+   args.AddOption(&corrections, "-corrections", "--corrections",
+                  "Maximum fresh-residual correction solves after CG (default 3, 0 disables); inner PCG relative tolerance 0.01.");
    args.ParseCheck(std::cerr);
    const std::string choice(choice_arg);
    MFEM_VERIFY(choice == "all" || choice == "macro" || choice == "macro-vertex" ||
                choice == "split" || choice == "split-patches", "invalid smoother");
    MFEM_VERIFY(refinements >= 0 && coarse_refinements >= 0 && steps > 0 &&
-               damping > 0 && damping < 0.5 && tolerance > 0 && max_it > 0,
+               damping > 0 && damping < 0.5 && tolerance > 0 && max_it > 0 && corrections >= 0,
                "invalid experiment parameters");
    MFEM_VERIFY(airy_damping > 0 &&
                ((choice != "all" && choice != "split") ||
@@ -113,7 +144,15 @@ int main(int argc, char *argv[])
    }
    ExactSolver coarse_inverse(levels[0]->form.SpMat());
    bool success = true;
-   std::cout << "refinement,elements,dofs,smoother,damping,airy_damping,steps,iterations,residual,converged,setup_s,solve_s\n"
+   std::ofstream history;
+   if (std::string(history_file).size())
+   {
+      history.open(history_file);
+      MFEM_VERIFY(history.good(), "cannot open residual history");
+      history << "refinement,smoother,iteration,recursive_residual,true_residual,residual_gap,extended_residual,preconditioned_residual\n"
+              << std::setprecision(17);
+   }
+   std::cout << "refinement,elements,dofs,smoother,damping,airy_damping,steps,iterations,residual,converged,setup_s,solve_s,corrections,correction_iterations,extended_residual\n"
              << std::setprecision(9);
    // Compare every prefix of ONE hierarchy; all configurations borrow the exact
    // same transfer objects. No transfer is constructed in split coordinates.
@@ -171,23 +210,26 @@ int main(int argc, char *argv[])
          Multigrid mg(ops, smoothers, prolongations, own_ops, own_smoothers, own_prolongations);
          mg.SetCycleType(Multigrid::CycleType::VCYCLE, steps, steps);
          const double setup = std::chrono::duration<double>(Clock::now()-start).count();
-         CGSolver cg;
-         ResidualMonitor monitor(A, rhs, tolerance);
-         cg.SetOperator(A); cg.SetPreconditioner(mg); cg.SetController(monitor);
-         cg.SetRelTol(0); cg.SetAbsTol(0); cg.SetMaxIter(max_it); cg.SetPrintLevel(-1);
-         x = 0.0;
+         ResidualMonitor monitor(A, rhs,
+                                 history.is_open() ? &history : nullptr,
+                                 coarse_refinements+depth, kind);
          const auto solve_start = Clock::now();
-         cg.Mult(rhs, x);
+         const auto result = VerifiedPCG(A, mg, rhs, x, tolerance, max_it,
+                                         corrections,
+                                         history.is_open() ? &monitor : nullptr);
          const double solve = std::chrono::duration<double>(Clock::now()-solve_start).count();
          A.Mult(x, residual); residual -= rhs;
          const real_t rel = residual.Norml2()/rhs.Norml2();
-         const bool converged = cg.GetConverged() && rel <= tolerance;
+         const bool converged = rel <= tolerance;
+         AccurateResidual(A, rhs, x, residual);
+         const real_t extended_rel = residual.Norml2()/rhs.Norml2();
          success = success && converged;
          std::cout << coarse_refinements+depth << ',' << hierarchy.GetFESpaceAtLevel(depth).GetNE()
                    << ',' << A.Height() << ',' << kind << ',' << damping
                    << ',' << (kind == "split" ? airy_damping : 0.0) << ',' << steps
-                   << ',' << cg.GetNumIterations() << ',' << rel << ',' << converged
-                   << ',' << setup << ',' << solve << std::endl;
+                   << ',' << result.iterations << ',' << rel << ',' << converged
+                   << ',' << setup << ',' << solve << ',' << result.corrections
+                   << ',' << result.correction_iterations << ',' << extended_rel << std::endl;
       }
    }
    return success ? 0 : 3;

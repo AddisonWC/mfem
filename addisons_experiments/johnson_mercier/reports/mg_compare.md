@@ -1,5 +1,11 @@
 # Johnson–Mercier multigrid with split patches and HCT Jacobi
 
+**Follow-up:** the [residual-stagnation investigation](mg_stagnation.md) identifies
+the late strict-tolerance plateau as a finite-precision residual gap and removes
+the refinement-6 failure with a fresh residual correction. It also compares
+residual norms through 148,224 unknowns; the iteration growth below is not, on
+its own, evidence of an unbounded preconditioned condition number.
+
 The split smoother now adds Jacobi corrections along the Airy images of the
 HCT potential basis to the existing split vertex patches. This substantially
 reduces iteration growth, but does **not** demonstrate refinement-independent
@@ -15,6 +21,11 @@ convergence. On the original refinement range, macro patches remain faster.
 The meshes are connected, straight, conforming triangulations. Every hierarchy
 prefix uses a symmetric V-cycle, equal pre/post smoothing counts, and a shared
 fixed direct coarse solve.
+
+The measurements and reproduction commands below describe the historical
+controller-based stopping rule. The current driver uses ordinary PCG followed
+by bounded fresh-residual corrections; iteration counts and exit statuses can
+therefore differ. See the follow-up for current commands and CSV semantics.
 
 ## Smoother and unchanged transfer
 

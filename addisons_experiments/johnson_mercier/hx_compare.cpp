@@ -27,30 +27,6 @@ using Clock = std::chrono::steady_clock;
 static double Seconds(Clock::time_point start)
 { return std::chrono::duration<double>(Clock::now()-start).count(); }
 
-// MFEM's usual CG tolerance uses the preconditioned norm. Use the same
-// unpreconditioned moment-coordinate residual criterion for every configuration.
-class CommonResidual : public IterativeSolverController
-{
-   const Operator &A;
-   const Vector &b;
-   real_t threshold;
-   Vector residual;
-public:
-   CommonResidual(const Operator &op, const Vector &rhs, real_t relative_tolerance)
-      : A(op), b(rhs), threshold(relative_tolerance*rhs.Norml2()), residual(rhs.Size()) { }
-   void MonitorResidual(int, real_t, const Vector &r, bool) override
-   { converged = r.Norml2() <= threshold; }
-   bool RequiresUpdatedSolution() const override { return true; }
-   void MonitorSolution(int, real_t, const Vector &x, bool) override
-   {
-      if (converged)
-      {
-         A.Mult(x, residual); residual -= b;
-         converged = residual.Norml2() <= threshold;
-      }
-   }
-};
-
 int main(int argc, char *argv[])
 {
    const char *mesh_file = JM_DEFAULT_MESH;
@@ -159,17 +135,14 @@ int main(int argc, char *argv[])
                for (int repeat = 0; repeat < repeats; repeat++)
                {
                   solution = 0.0;
-                  CGSolver cg;
-                  CommonResidual monitor(am.SpMat(), rhs, tolerance);
-                  cg.SetOperator(am.SpMat()); cg.SetPreconditioner(hx);
-                  cg.SetRelTol(0.0); cg.SetAbsTol(0.0); cg.SetController(monitor);
-                  cg.SetMaxIter(max_iterations); cg.SetPrintLevel(-1);
-                  start = Clock::now(); cg.Mult(rhs, solution);
+                  start = Clock::now();
+                  const auto result = VerifiedPCG(am.SpMat(), hx, rhs, solution,
+                                                   tolerance, max_iterations);
                   times.push_back(Seconds(start));
                   am.SpMat().Mult(solution, residual); residual -= rhs;
                   relative_residual = residual.Norml2()/rhs_norm;
-                  converged = converged && cg.GetConverged() && relative_residual <= tolerance;
-                  iterations = cg.GetNumIterations();
+                  converged = converged && relative_residual <= tolerance;
+                  iterations = result.iterations + result.correction_iterations;
                   start = Clock::now(); hx.Mult(rhs, residual);
                   apply_times.push_back(Seconds(start));
                }
