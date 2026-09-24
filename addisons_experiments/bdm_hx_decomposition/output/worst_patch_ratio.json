@@ -1,0 +1,28 @@
+{
+  "10": {
+    "mesh": 10,
+    "bdm_dimension": 640,
+    "continuous_polynomial_degree": 12,
+    "maximum_ratio": 2.273135956621497,
+    "plot_metrics": {
+      "source_hdiv_squared": 1.0000000000000013,
+      "smooth_h1_squared": 41.47605408267088,
+      "potential_h1_squared": 0.04721908387624071,
+      "local_hdiv_squared": 2.273135956684791,
+      "total_alpha_quarter": 42.09155715571832,
+      "total_alpha_one": 43.79640912323191,
+      "total_alpha_four": 50.61581699328629,
+      "reconstruction_l2_dof": 8.467204828447496e-11,
+      "commuting_l2_dof": 1.468904332664136e-14,
+      "continuous_h1_product_squared": 53.51227172670234,
+      "continuous_s_h1_squared": 53.46347306447872,
+      "continuous_q_h1_squared": 0.04879866222361784,
+      "nodal_s_h1_squared_ratio": 0.7757830104424638,
+      "moment_q_h1_squared_ratio": 0.9676307038881767,
+      "moment_s_hdiv_squared_ratio": 0.01956086956658205,
+      "polynomial_degree_convergence": {
+        "12": 53.51227172670234
+      }
+    }
+  }
+}

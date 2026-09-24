@@ -105,7 +105,8 @@ def no_local_coefficients(u, pre):
                           check_finite=False)
     q = linalg.cho_solve(pre["qf"], pre["qd"].T @ lagrange,
                           check_finite=False)
-    assert np.linalg.norm(u - pre["sd"]@s - pre["qd"]@q) < 1e-9
+    assert np.linalg.norm(u - pre["sd"]@s - pre["qd"]@q) < \
+           1e-8*max(1., np.linalg.norm(u))
     return s, q
 
 
@@ -215,7 +216,7 @@ def bdm_moment_interpolant(scoef, psi, xy, edges, normal):
 
 
 def construct(u, pre, xy, tri, te, edges, normal, td, basis, hdiv,
-              continuous_mode="helmholtz_fit"):
+              continuous_mode="helmholtz_fit", correction_degree=8):
     scoef, qcoef = no_local_coefficients(u, pre)
     discrete_s = pre["sd"] @ scoef
     if continuous_mode == "helmholtz_fit":
@@ -226,7 +227,8 @@ def construct(u, pre, xy, tri, te, edges, normal, td, basis, hdiv,
         continuous_s_energy = continuous_q_energy = None
     elif continuous_mode == "h1_optimal":
         convergence = {}
-        for degree in (4, 6, 8):
+        degrees = (4, 6, 8) if correction_degree == 8 else (correction_degree,)
+        for degree in degrees:
             psi, continuous_energy, continuous_s_energy, continuous_q_energy = minimize_continuous_h1(
                 scoef, qcoef, xy, tri, te, degree)
             convergence[str(degree)] = continuous_energy

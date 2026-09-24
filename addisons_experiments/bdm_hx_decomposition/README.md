@@ -186,3 +186,32 @@ interpolant and commuting edge moments reconstruct accurately and yield small
 local corrections. Point evaluation is not bounded on general H1 functions
 in two dimensions, so these experiments do not justify a mesh-independent
 bound for nodal interpolation without smoothing.
+
+## Worst patch-amplification search
+
+`maximize_patch_ratio.py` forms the linear map from a BDM input to the vertex
+terms after the H1-product continuous minimization and moment/nodal
+interpolation. It finds the largest generalized eigenvalue of the local
+H(div) product matrix against the BDM H(div) matrix. Inputs are normalized to
+unit H(div) norm. This gives the exact worst field for the chosen finite
+correction space, not automatically for the infinite-dimensional continuous
+minimizer.
+
+The most resolved 10×10 search uses C2 bicubic tensor splines with three
+spline cells per BDM cell. Its worst ratio is **0.9464**; see the
+[10×10 worst-case plot](output/worst_patch_ratio_n10_spline_ref3.png).
+With just one spline cell per BDM cell, the worst ratio is 4.128 on 10×10
+and 11.167 on 20×20; the [20×20 plot](output/worst_patch_ratio_n20_spline.png)
+shows that under-resolved case. Refining the continuous correction space on
+the *same* 10×10 BDM mesh lowers the ratio from 4.128 to 1.080 to 0.946.
+At three spline cells per BDM cell, the tested 5×5, 10×10, and 15×15 ratios
+are 0.460, 0.946, and 1.750. The 15×15 continuous solve may still need more
+resolution. These numbers suggest possible growth but do not establish
+blow-up for the exact continuous procedure. Full values are in the
+[resolution study](output/worst_patch_ratio_resolution_study.json).
+
+```sh
+MPLCONFIGDIR=/tmp/mpl-bdm-hx OPENBLAS_NUM_THREADS=1 \
+  python3 addisons_experiments/bdm_hx_decomposition/maximize_patch_ratio.py \
+  --basis spline --spline-refinement 3 --meshes 10 --plot-n 10
+```

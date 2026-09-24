@@ -1,0 +1,37 @@
+{
+  "5": {
+    "mesh": 5,
+    "bdm_dimension": 170,
+    "continuous_polynomial_degree": 8,
+    "correction_basis": "spline",
+    "maximum_ratio": 1.2634982124386782
+  },
+  "10": {
+    "mesh": 10,
+    "bdm_dimension": 640,
+    "continuous_polynomial_degree": 8,
+    "correction_basis": "spline",
+    "maximum_ratio": 4.128238833214204
+  },
+  "15": {
+    "mesh": 15,
+    "bdm_dimension": 1410,
+    "continuous_polynomial_degree": 8,
+    "correction_basis": "spline",
+    "maximum_ratio": 7.507291260451114
+  },
+  "20": {
+    "mesh": 20,
+    "bdm_dimension": 2480,
+    "continuous_polynomial_degree": 8,
+    "correction_basis": "spline",
+    "maximum_ratio": 11.166786211184482,
+    "plot_metrics": {
+      "source_hdiv_squared": 1.0000000000000009,
+      "local_hdiv_squared": 11.16678621118449,
+      "smooth_h1_squared": 298.54808110903485,
+      "potential_h1_squared": 0.030328801580411582,
+      "reconstruction_l2_dof": 1.5389378263091302e-09
+    }
+  }
+}

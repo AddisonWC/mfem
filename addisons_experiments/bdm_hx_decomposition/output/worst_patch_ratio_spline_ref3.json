@@ -1,0 +1,17 @@
+{
+  "10": {
+    "mesh": 10,
+    "bdm_dimension": 640,
+    "continuous_polynomial_degree": 8,
+    "correction_basis": "spline",
+    "spline_refinement": 3,
+    "maximum_ratio": 0.9463805637862698,
+    "plot_metrics": {
+      "source_hdiv_squared": 1.0,
+      "local_hdiv_squared": 0.9463805637862673,
+      "smooth_h1_squared": 1.8136648604753396,
+      "potential_h1_squared": 0.00010212021409865403,
+      "reconstruction_l2_dof": 2.9008430019491632e-11
+    }
+  }
+}
