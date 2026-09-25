@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import plot_decompositions as base
+from paths import FIGURES
 
 
 def scalar_p2_image(q, n, tri, te, resolution=600):
@@ -80,7 +81,7 @@ def main():
     fig.suptitle("Multiscale noisy potential · source construction", fontsize=19, y=.986)
     fig.subplots_adjust(left=.018, right=.985, bottom=.035, top=.925,
                         wspace=.065, hspace=.16)
-    path = Path(__file__).parent / "output" / "multiscale_noisy_potential_source.png"
+    path = FIGURES / "multiscale_noisy_potential_source.png"
     path.parent.mkdir(exist_ok=True)
     fig.savefig(path, dpi=120)
     plt.close(fig)

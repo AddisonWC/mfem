@@ -9,10 +9,12 @@ import numpy as np
 from numpy.polynomial.legendre import leggauss
 from scipy import linalg
 from scipy.interpolate import BSpline
-from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import splu
+import sparse_continuous
 
 import plot_decompositions as base
 import plot_constructive_hx as constructive
+from paths import AGENT_ARTIFACTS
 
 
 class TensorSplinePotential:
@@ -135,11 +137,15 @@ def find_worst(n, degree=8, basis_type="polynomial", spline_refinement=1):
     correction_space = (TensorSplinePotential(n*spline_refinement)
                         if basis_type == "spline"
                         else None)
-    potential, gram, cs, cq = continuous_quadratic_maps(
-        xy, tri, te, degree, correction_space,
-        spline_refinement if basis_type == "spline" else 1)
-    nodal, scalar = moment_maps(potential, xy, edges,
-                                 spline_refinement if basis_type == "spline" else 1)
+    if correction_space is not None:
+        potential = correction_space
+        gram, cs, cq = sparse_continuous.assemble(xy, tri, te, potential,
+                                                 spline_refinement)
+        nodal, scalar = sparse_continuous.moments(potential, xy, edges,
+                                                 spline_refinement)
+    else:
+        potential, gram, cs, cq = continuous_quadratic_maps(xy, tri, te, degree)
+        nodal, scalar = moment_maps(potential, xy, edges)
     dmap = pre["qd"] @ scalar - pre["sd"] @ nodal
     # psi coefficients = E u, where u is in endpoint-normal BDM coordinates.
     b = pre["bs"] + pre["bq"]
@@ -147,33 +153,44 @@ def find_worst(n, degree=8, basis_type="polynomial", spline_refinement=1):
     rhs = (cs @ linalg.cho_solve(pre["sf"], pre["sd"].T, check_finite=False) +
            cq @ linalg.cho_solve(pre["qf"], pre["qd"].T, check_finite=False))
     rhs = linalg.cho_solve(bfactor, rhs.T, check_finite=False).T
-    emap = -linalg.cho_solve(linalg.cho_factor(gram, check_finite=False),
-                              rhs, check_finite=False)
+    if correction_space is not None:
+        emap = -splu(gram).solve(rhs)
+    else:
+        emap = -linalg.cho_solve(linalg.cho_factor(gram, check_finite=False),
+                               rhs, check_finite=False)
+    residual = np.linalg.norm(gram @ emap + rhs)/np.linalg.norm(rhs)
     # W is the sum of exact local H(div) matrices after endpoint partitioning.
     wlocal = np.zeros_like(pre["av"])
     for ids, _ in pre["fact"]:
         wlocal[np.ix_(ids, ids)] = pre["av"][np.ix_(ids, ids)]
-    ksmall = dmap.T @ wlocal @ dmap
-    ksmall = (ksmall+ksmall.T)/2
-    eig, vec = linalg.eigh(ksmall, check_finite=False)
-    active = eig > max(eig[-1]*1e-11, 1e-12)
-    factor = vec[:, active] * np.sqrt(eig[active])[None, :]
-    ainverse_et = spsolve(hdiv, emap.T)
-    small = factor.T @ emap @ ainverse_et @ factor
-    small = (small+small.T)/2
-    top, z = linalg.eigh(small, subset_by_index=(small.shape[0]-1,
-                                                 small.shape[0]-1),
-                         check_finite=False)
+    # Work in BDM coordinates, never diagonalize the growing spline space.
+    localmap = dmap @ emap
+    numerator = localmap.T @ wlocal @ localmap
+    numerator = (numerator + numerator.T)/2
+    top, vec = linalg.eigh(numerator, hdiv.toarray(),
+                          subset_by_index=(len(b)-1, len(b)-1),
+                          check_finite=False)
     ratio = float(top[0])
-    u = ainverse_et @ (factor @ z[:, 0]) / np.sqrt(ratio)
+    u = vec[:, 0]
     if u[np.argmax(np.abs(u))] < 0:
         u = -u
     local = dmap @ (emap @ u)
     exact_ratio = float(local @ wlocal @ local / (u @ hdiv @ u))
     assert abs(exact_ratio-ratio) < 1e-8*max(1, ratio)
+    continuous_norms = {}
+    if correction_space is not None:
+        scoef, qcoef = constructive.no_local_coefficients(u, pre)
+        psi = emap @ u
+        gq = sparse_continuous.gram_matrix(potential, potential_only=True)
+        continuous_norms = dict(
+            continuous_s_h1_squared=float(scoef @ pre['hs'] @ scoef +
+                2*psi @ cs @ scoef + psi @ ((gram-gq) @ psi)),
+            continuous_q_h1_squared=float(qcoef @ pre['hq'] @ qcoef +
+                2*psi @ cq @ qcoef + psi @ (gq @ psi)))
     return dict(n=n, degree=degree, basis_type=basis_type,
                 spline_refinement=spline_refinement,
-                ratio=ratio, field=u,
+                ratio=ratio, field=u, residual=residual, gram=gram, rhs=rhs,
+                localmap=localmap, wlocal=wlocal, continuous_norms=continuous_norms,
                 xy=xy, tri=tri, edges=edges, te=te, normal=normal,
                 td=td, basis=basis, hdiv=hdiv, pre=pre,
                 dmap=dmap, emap=emap, nodal=nodal, scalar=scalar)
@@ -204,6 +221,12 @@ def plot_worst(result, out):
                        smooth_h1_squared=float(smooth_coef @ pre["hs"] @ smooth_coef),
                        potential_h1_squared=float(q_coef @ pre["hq"] @ q_coef),
                        reconstruction_l2_dof=float(np.linalg.norm(u-smooth-sol-local)))
+    metrics.update(result['continuous_norms'])
+    if result['continuous_norms']:
+        metrics['nodal_s_h1_squared_ratio'] = (metrics['smooth_h1_squared']/
+                                               metrics['continuous_s_h1_squared'])
+        metrics['moment_q_h1_squared_ratio'] = (metrics['potential_h1_squared']/
+                                               metrics['continuous_q_h1_squared'])
     numerator = metrics["local_hdiv_squared"]
     denominator = metrics["source_hdiv_squared"]
     assert abs(numerator/denominator-result["ratio"]) < 1e-7
@@ -238,7 +261,7 @@ def main():
                         default="polynomial")
     parser.add_argument("--spline-refinement", type=int, default=1)
     args = parser.parse_args()
-    out = Path(__file__).parent / "output"
+    out = AGENT_ARTIFACTS
     out.mkdir(exist_ok=True)
     summary = {}
     for n in args.meshes:
@@ -248,7 +271,8 @@ def main():
                            "continuous_polynomial_degree": args.degree,
                            "correction_basis": args.basis,
                            "spline_refinement": args.spline_refinement,
-                           "maximum_ratio": result["ratio"]}
+                           "maximum_ratio": result["ratio"],
+                           "relative_stationarity_residual": result["residual"]}
         print(n, result["ratio"], flush=True)
         if n == args.plot_n:
             summary[str(n)]["plot_metrics"] = plot_worst(result, out)

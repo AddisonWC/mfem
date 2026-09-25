@@ -17,6 +17,8 @@ import numpy as np
 from scipy import linalg, sparse
 from scipy.sparse.linalg import spsolve
 
+from paths import FIGURES
+
 
 QPTS = np.array([[1 / 6, 1 / 6, 2 / 3], [1 / 6, 2 / 3, 1 / 6],
                  [2 / 3, 1 / 6, 1 / 6]])
@@ -79,10 +81,15 @@ def assemble_h1(xy, tri, te, n_vertices, degree):
     gradlam, area = geometry(xy, tri)
     nd = n_vertices if degree == 1 else n_vertices + int(te.max()) + 1
     rows, cols, data = [], [], []
+    # P2 mass products have degree four; the three-point rule is insufficient.
+    z, w = np.polynomial.legendre.leggauss(3)
+    z, w = (z+1)/2, w/2
+    points = np.array([[1-a-(1-a)*b, a, (1-a)*b] for a in z for b in z])
+    weights = np.array([2*wa*wb*(1-a) for a, wa in zip(z, w) for wb in w])
     for k, t in enumerate(tri):
         ids = t if degree == 1 else np.r_[t, n_vertices + te[k]]
         block = np.zeros((len(ids), len(ids)))
-        for w, lam in zip(QWTS, QPTS):
+        for w, lam in zip(weights, points):
             if degree == 1:
                 vals, grads = lam, gradlam[k]
             else:
@@ -419,7 +426,7 @@ def plot_figure(path, title, source, smooth, divergence_free, patch, info,
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, default=Path(__file__).parent / "output")
+    parser.add_argument("--output", type=Path, default=FIGURES)
     parser.add_argument("--helmholtz-resolution", type=int, default=40)
     args = parser.parse_args()
     if args.helmholtz_resolution < 10 or args.helmholtz_resolution % 10:

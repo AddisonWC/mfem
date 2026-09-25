@@ -9,6 +9,7 @@ from numpy.polynomial.legendre import legder, legval, leggauss
 from scipy import linalg
 
 import plot_decompositions as base
+from paths import FIGURES
 
 
 def eval_p2_gradient(fine, points):
@@ -283,7 +284,7 @@ def construct(u, pre, xy, tri, te, edges, normal, td, basis, hdiv,
 
 
 def main():
-    out = Path(__file__).parent / "output"
+    out = FIGURES
     out.mkdir(exist_ok=True)
     xy, tri, edges, te, _ = base.mesh(10)
     normal, td, basis = base.bdm_data(xy, tri, edges, te)
