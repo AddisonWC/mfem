@@ -1,11 +1,13 @@
 // Tests for the split-mesh JM HX and multigrid experiments.
 #include "unit_tests.hpp"
 #include "common.hpp"
+#include "hx_composition.hpp"
 
 using namespace mfem;
 using namespace mfem::jm_hx;
 
-TEST_CASE("Verified PCG corrects a failed true-residual check", "[JohnsonMercier][HX]")
+TEST_CASE("Verified PCG corrects a failed true-residual check",
+          "[JohnsonMercier][HX]")
 {
    // The preconditioned residual hides the second component, so ordinary CG
    // stops before the Euclidean residual meets the same relative tolerance.
@@ -28,7 +30,8 @@ TEST_CASE("Verified PCG corrects a failed true-residual check", "[JohnsonMercier
    REQUIRE(residual.Norml2() <= 0.1*b.Norml2());
 }
 
-TEST_CASE("JM HX coordinate maps and split H1 inclusion", "[JohnsonMercier][HX]")
+TEST_CASE("JM HX coordinate maps and split H1 inclusion",
+          "[JohnsonMercier][HX]")
 {
    Mesh mesh = Mesh::MakeCartesian2D(2, 2, Element::TRIANGLE, true);
    for (int v = 0; v < mesh.GetNV(); v++)
@@ -127,7 +130,8 @@ TEST_CASE("JM HX coordinate maps and split H1 inclusion", "[JohnsonMercier][HX]"
             Vector point(2), value;
             S.Transform(ip, point);
             IntegrationPoint macro_ip;
-            REQUIRE(inverse.Transform(point, macro_ip) == InverseElementTransformation::Inside);
+            REQUIRE(inverse.Transform(point,
+                                      macro_ip) == InverseElementTransformation::Inside);
             T.SetIntPoint(&macro_ip);
             DenseTensor shape(2,2,15);
             vertices.GetFE(e)->CalcMShape(T, shape);
@@ -144,13 +148,15 @@ TEST_CASE("JM HX coordinate maps and split H1 inclusion", "[JohnsonMercier][HX]"
    }
 }
 
-TEST_CASE("JM multigrid patches preserve moment prolongation", "[JohnsonMercier][HX][Multigrid]")
+TEST_CASE("JM multigrid patches preserve moment prolongation",
+          "[JohnsonMercier][HX][Multigrid]")
 {
    JohnsonMercierFECollection fm, fv(JMBasis::SplitVertex);
    auto mesh = new Mesh(Mesh::MakeCartesian2D(1, 1, Element::TRIANGLE, true));
    auto coarse = new FiniteElementSpace(mesh, &fm);
    FiniteElementSpaceHierarchy hierarchy(mesh, coarse, true, true);
-   hierarchy.AddUniformlyRefinedLevel(1, Ordering::byVDIM, Operator::MFEM_SPARSEMAT);
+   hierarchy.AddUniformlyRefinedLevel(1, Ordering::byVDIM,
+                                      Operator::MFEM_SPARSEMAT);
    auto &fine = hierarchy.GetFinestFESpace();
    FiniteElementSpace vertices(fine.GetMesh(), &fv);
    BilinearForm ac(coarse), af(&fine);
@@ -185,7 +191,8 @@ TEST_CASE("JM multigrid patches preserve moment prolongation", "[JohnsonMercier]
    Array<Operator *> ops, transfers;
    ops.Append(&ac.SpMat()); ops.Append(&af.SpMat());
    transfers.Append(hierarchy.GetProlongationAtLevel(0));
-   Array<bool> own_ops(2), own_transfers(1); own_ops = false; own_transfers = false;
+   Array<bool> own_ops(2), own_transfers(1); own_ops = false;
+   own_transfers = false;
    Vector c(coarse->GetVSize()), before(fine.GetVSize()), after(fine.GetVSize());
    for (int i = 0; i < c.Size(); i++) { c(i) = std::cos(i+0.4); }
    transfers[0]->Mult(c, before);
@@ -196,7 +203,8 @@ TEST_CASE("JM multigrid patches preserve moment prolongation", "[JohnsonMercier]
    Vector *answers[] = {&ym, &yv, &ys, &yh};
    for (int k = 0; k < 4; k++)
    {
-      Array<Solver *> smoothers; smoothers.Append(&inverse); smoothers.Append(variants[k]);
+      Array<Solver *> smoothers; smoothers.Append(&inverse);
+      smoothers.Append(variants[k]);
       Multigrid mg(ops, smoothers, transfers, own_ops, own_ops, own_transfers);
       mg.SetCycleType(Multigrid::CycleType::VCYCLE, 1, 1);
       mg.Mult(rhs, *answers[k]);
@@ -246,4 +254,75 @@ TEST_CASE("HCT image Jacobi matches energy-normalized Airy basis corrections",
    smoother.Mult(rhs, actual);
    actual -= expected;
    REQUIRE(actual.Norml2() < 1e-10*expected.Norml2());
+}
+
+TEST_CASE("HX Airy correction is an energy projection", "[JohnsonMercier][HX]")
+{
+   Mesh mesh = Mesh::MakeCartesian2D(2, 2, Element::TRIANGLE, true);
+   JohnsonMercierFECollection fm, fv(JMBasis::SplitVertex);
+   FiniteElementSpace m(&mesh, &fm), v(&mesh, &fv);
+   auto map = BasisMatrix(m, v);
+   BilinearForm a(&m);
+   a.AddDomainIntegrator(new MatrixFEMassIntegrator);
+   a.AddDomainIntegrator(new MatrixDivDivIntegrator);
+   a.Assemble(); a.Finalize();
+   const int n = m.GetVSize();
+   Vector x(n), ax(n), px(n), apx(n), ppx(n), sum(n), term(n);
+   x.Randomize(19); a.SpMat().Mult(x, ax);
+   for (bool split : {false, true})
+   {
+      AuxiliaryCorrection aux(m, v, *map, split);
+      aux.AiryMult(ax, px); a.SpMat().Mult(px, apx);
+      aux.AiryMult(apx, ppx); ppx -= px;
+      REQUIRE(ppx.Norml2() < 1e-9*px.Norml2());
+      REQUIRE(std::abs(px*ax - px*apx) < 1e-9*std::abs(px*apx));
+      aux.H1Mult(ax, sum); aux.AiryMult(ax, term); sum += term;
+      aux.Mult(ax, term); sum -= term;
+      REQUIRE(sum.Norml2() < 1e-13*term.Norml2());
+   }
+}
+
+TEST_CASE("HX grouped additive center satisfies symmetric factor formula",
+          "[JohnsonMercier][HX]")
+{
+   Mesh mesh = Mesh::MakeCartesian2D(2, 2, Element::TRIANGLE, true);
+   JohnsonMercierFECollection fm, fv(JMBasis::SplitVertex);
+   FiniteElementSpace m(&mesh, &fm), v(&mesh, &fv);
+   auto map = BasisMatrix(m,v);
+   BilinearForm am(&m), av(&v);
+   for (auto a : {&am,&av})
+   {
+      a->AddDomainIntegrator(new MatrixFEMassIntegrator);
+      a->AddDomainIntegrator(new MatrixDivDivIntegrator);
+      a->Assemble(); a->Finalize();
+   }
+   int n=m.GetVSize();
+   Vector x(n), u(n), lx(n), alx(n), lalx(n), mid(n), tmp(n), amid(n), lamid(n),
+          expected(n), actual(n), bu(n);
+   x.Randomize(7);
+   const SpectrumConfig cfg{"test","H(C+S)H",.71,.63,1.37};
+   for (bool split : {false,true})
+   {
+      AuxiliaryCorrection aux(m,v,*map,split);
+      for (bool small : {false,true})
+      {
+         PatchSolver local(av.SpMat(),v,small); MappedSolver S(*map,local);
+         SpectrumComposition B(am.SpMat(),S,aux,cfg);
+         // L=hH, M=cC+sS: B=2L-LAL+(I-LA)M(I-AL).
+         aux.H1Mult(x,lx); lx*=cfg.h;
+         am.SpMat().Mult(lx,alx);
+         aux.H1Mult(alx,lalx); lalx*=cfg.h;
+         u=x; u-=alx;
+         aux.AiryMult(u,mid); mid*=cfg.c;
+         S.Mult(u,tmp); mid.Add(cfg.s,tmp);
+         am.SpMat().Mult(mid,amid);
+         aux.H1Mult(amid,lamid); lamid*=cfg.h;
+         expected=lx; expected*=2.; expected-=lalx; expected+=mid; expected-=lamid;
+         B.Mult(x,actual); expected-=actual;
+         REQUIRE(expected.Norml2()<1e-11*actual.Norml2());
+         u.Randomize(13); B.Mult(u,bu);
+         REQUIRE(std::abs(u*actual-x*bu)<1e-11*(u.Norml2()*actual.Norml2()+x.Norml2()
+                                                *bu.Norml2()));
+      }
+   }
 }

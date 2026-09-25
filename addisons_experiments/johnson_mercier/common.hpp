@@ -419,12 +419,19 @@ public:
       hct_inverse.reset(new ExactSolver(hct_form.SpMat()));
    }
    int H1Size() const { return h1.GetVSize(); }
-   void Mult(const Vector &x, Vector &y) const override
+   void H1Mult(const Vector &x, Vector &y) const
    {
       pi->MultTranspose(x, rhs1); h1_inverse->Mult(rhs1, sol1); pi->Mult(sol1, y);
+   }
+   void AiryMult(const Vector &x, Vector &y) const
+   {
       airy.MultTranspose(x, rhs2);
       for (int d : gauge) { rhs2(UnsignIndex(d)) = 0.0; }
-      hct_inverse->Mult(rhs2, sol2); airy.Mult(sol2, correction); y += correction;
+      hct_inverse->Mult(rhs2, sol2); airy.Mult(sol2, y);
+   }
+   void Mult(const Vector &x, Vector &y) const override
+   {
+      H1Mult(x, y); AiryMult(x, correction); y += correction;
    }
    void SetOperator(const Operator &) override { MFEM_ABORT("fixed auxiliary spaces"); }
    void MultTranspose(const Vector &x, Vector &y) const override { Mult(x, y); }

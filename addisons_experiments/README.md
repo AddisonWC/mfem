@@ -39,6 +39,11 @@ OPENBLAS_NUM_THREADS=1 ./mg_compare -r 3 > mg.csv
 
 - `johnson_mercier/common.hpp`: shared experimental meshes, maps, and solvers.
 - `johnson_mercier/{hx,mg}_compare.cpp`: comparison drivers.
+- `johnson_mercier/hx_spectrum.cpp`: energy-inner-product Lanczos and weighted
+  additive/symmetric multiplicative HX spectra. Enable with
+  `-DJM_BUILD_SPECTRUM=ON` (requires LP64 LAPACK and ARPACK-ng).
+- [Square-mesh HX eigenvalue study](johnson_mercier/reports/hx_spectrum.md):
+  patch sizes, auxiliary-space splitting, weight tuning, and refinement limits.
 - `johnson_mercier/tests/`: experiment validation, run only by this project.
 - [HX report](johnson_mercier/reports/hx_compare.md) and
   [multigrid report](johnson_mercier/reports/mg_compare.md).
@@ -61,3 +66,6 @@ commands, compiler/build settings, solver backend, hardware, and thread count.
 Keep routine outputs in ignored `build/` or `output/` directories. Preserve
 library-level basis, interpolation, orientation, and transfer tests in MFEM's
 normal test suite, independently of this project's solver tests.
+
+[Smoother-centered and hybrid HX follow-up](johnson_mercier/reports/hx_middle.md)
+compares HCSCH, CHSHC, and independently damped H(C+S)H.
