@@ -29,6 +29,7 @@
 #include "fe/fe_jm.hpp"
 #include "fe/fe_nd.hpp"
 #include "fe/fe_rt.hpp"
+#include "fe/fe_bdm.hpp"
 #include "fe/fe_l2.hpp"
 #include "fe/fe_nurbs.hpp"
 #include "fe/fe_pos.hpp"

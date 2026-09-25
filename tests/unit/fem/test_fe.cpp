@@ -610,6 +610,18 @@ TEST_CASE("Brezzi-Douglas-Marini Finite Element Collection",
             REQUIRE(fec.DofOrderForOrientation(Geometry::SQUARE, 0) == nullptr);
          }
 
+         std::unique_ptr<FiniteElementCollection> trace(
+            fec.GetTraceCollection());
+         const Geometry::Type face = dim == 2 ? Geometry::SEGMENT :
+                                     Geometry::TRIANGLE;
+         REQUIRE(trace->FiniteElementForGeometry(face) != nullptr);
+         REQUIRE(trace->DofForGeometry(face) == fec.DofForGeometry(face));
+         REQUIRE(trace->DofOrderForOrientation(face, 0) != nullptr);
+         if (dim == 3)
+         {
+            REQUIRE(trace->FiniteElementForGeometry(Geometry::SQUARE) != nullptr);
+         }
+
          std::unique_ptr<FiniteElementCollection> copy(
             FiniteElementCollection::New(fec.Name()));
          REQUIRE(copy != nullptr);

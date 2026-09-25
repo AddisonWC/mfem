@@ -75,6 +75,7 @@ set(SRCS
   fe/fe_base.cpp
   fe/fe_fixed_order.cpp
   fe/fe_h1.cpp
+  fe/fe_bdm.cpp
   fe/fe_bell.cpp
   fe/fe_hzzz.cpp
   fe/fe_argyris.cpp
@@ -242,6 +243,7 @@ set(HDRS
   fe/fe_base.hpp
   fe/fe_fixed_order.hpp
   fe/fe_h1.hpp
+  fe/fe_bdm.hpp
   fe/fe_bell.hpp
   fe/fe_hzzz.hpp
   fe/fe_argyris.hpp

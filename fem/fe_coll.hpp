@@ -450,14 +450,13 @@ protected:
 
    // Initialize only the face elements
    void InitFaces(const int p, const int dim, const int map_type,
-                  const bool signs, const bool simplex_only = false);
+                  const bool signs);
 
    // Constructor used by the constructor of the RT_Trace_FECollection and
    // DG_Interface_FECollection classes
    RT_FECollection(const int p, const int dim, const int map_type,
                    const bool signs,
-                   const int ob_type = BasisType::GaussLegendre,
-                   const bool simplex_only = false);
+                   const int ob_type = BasisType::GaussLegendre);
 
 public:
    /// Construct an H(div)-conforming Raviart-Thomas FE collection, RT_p.
@@ -504,7 +503,10 @@ public:
 
     The degrees of freedom are point evaluations, as in the simplex RT
     elements. Project() performs nodal interpolation, not canonical BDM
-    moment interpolation. */
+    moment interpolation; a commuting divergence projection is not implied.
+    GetTraceCollection() returns an RT trace collection. In 3D that trace
+    collection also supports square faces, even though this collection
+    supports only simplex cells. */
 class BDM_FECollection : public FiniteElementCollection
 {
    int dim;

@@ -2891,10 +2891,10 @@ RT_FECollection::RT_FECollection(const int order, const int dim,
    }
 }
 
-// Initialize facet elements for trace, interface, and simplex-only collections.
+// Initialize facet elements for trace and interface collections.
 RT_FECollection::RT_FECollection(const int p, const int dim,
                                  const int map_type, const bool signs,
-                                 const int ob_type, const bool simplex_only)
+                                 const int ob_type)
    : FiniteElementCollection(p + 1)
    , dim(dim)
    , ob_type(ob_type)
@@ -2905,17 +2905,7 @@ RT_FECollection::RT_FECollection(const int p, const int dim,
       const char *ob_name = BasisType::Name(ob_type); // this may abort
       MFEM_ABORT("Invalid open basis type: " << ob_name);
    }
-   InitFaces(p, dim, map_type, signs, simplex_only);
-}
-
-namespace
-{
-class BDMFaceCollection : public RT_FECollection
-{
-public:
-   BDMFaceCollection(int p, int dim, int ob_type)
-      : RT_FECollection(p, dim, FiniteElement::INTEGRAL, true, ob_type, true) { }
-};
+   InitFaces(p, dim, map_type, signs);
 }
 
 BDM_FECollection::BDM_FECollection(const int p, const int dim,
@@ -2945,7 +2935,8 @@ BDM_FECollection::BDM_FECollection(const int p, const int dim,
    {
       volume_fe.reset(new BDM_TetrahedronElement(p, ob_type));
    }
-   face_fec.reset(new BDMFaceCollection(p, dim, ob_type));
+   face_fec.reset(new RT_Trace_FECollection(p, dim, FiniteElement::INTEGRAL,
+                                            ob_type));
 }
 
 const FiniteElement *BDM_FECollection::FiniteElementForGeometry(
@@ -2992,7 +2983,7 @@ FiniteElementCollection *BDM_FECollection::GetTraceCollection() const
 
 void RT_FECollection::InitFaces(const int p, const int dim_,
                                 const int map_type,
-                                const bool signs, const bool simplex_only)
+                                const bool signs)
 {
    int op_type = BasisType::GetQuadrature1D(ob_type);
 
@@ -3042,14 +3033,11 @@ void RT_FECollection::InitFaces(const int p, const int dim_,
       RT_Elements[Geometry::TRIANGLE] = l2_tri;
       RT_dof[Geometry::TRIANGLE] = pp1*pp2/2;
 
-      if (!simplex_only)
-      {
-         L2_QuadrilateralElement *l2_quad =
-            new L2_QuadrilateralElement(p, ob_type);
-         l2_quad->SetMapType(map_type);
-         RT_Elements[Geometry::SQUARE] = l2_quad;
-         RT_dof[Geometry::SQUARE] = pp1*pp1;
-      }
+      L2_QuadrilateralElement *l2_quad =
+         new L2_QuadrilateralElement(p, ob_type);
+      l2_quad->SetMapType(map_type);
+      RT_Elements[Geometry::SQUARE] = l2_quad;
+      RT_dof[Geometry::SQUARE] = pp1*pp1;
 
       int TriDof = RT_dof[Geometry::TRIANGLE];
       TriDofOrd[0] = (TriDof > 0) ? new int[6*TriDof] : nullptr;
@@ -3081,34 +3069,31 @@ void RT_FECollection::InitFaces(const int p, const int dim_,
          }
       }
 
-      if (!simplex_only)
+      int QuadDof = RT_dof[Geometry::SQUARE];
+      QuadDofOrd[0] = (QuadDof > 0) ? new int[8*QuadDof] : nullptr;
+      for (int i = 1; i < 8; i++)
       {
-         int QuadDof = RT_dof[Geometry::SQUARE];
-         QuadDofOrd[0] = (QuadDof > 0) ? new int[8*QuadDof] : nullptr;
-         for (int i = 1; i < 8; i++)
+         QuadDofOrd[i] = QuadDofOrd[i-1] + QuadDof;
+      }
+      // see Mesh::GetQuadOrientation in mesh/mesh.cpp
+      for (int j = 0; j <= p; j++)
+      {
+         for (int i = 0; i <= p; i++)
          {
-            QuadDofOrd[i] = QuadDofOrd[i-1] + QuadDof;
-         }
-         // see Mesh::GetQuadOrientation in mesh/mesh.cpp
-         for (int j = 0; j <= p; j++)
-         {
-            for (int i = 0; i <= p; i++)
+            int o = i + j*pp1;
+            QuadDofOrd[0][o] = i + j*pp1;                    // (0,1,2,3)
+            QuadDofOrd[1][o] = -1 - (j + i*pp1);             // (0,3,2,1)
+            QuadDofOrd[2][o] = j + (p - i)*pp1;              // (1,2,3,0)
+            QuadDofOrd[3][o] = -1 - ((p - i) + j*pp1);       // (1,0,3,2)
+            QuadDofOrd[4][o] = (p - i) + (p - j)*pp1;        // (2,3,0,1)
+            QuadDofOrd[5][o] = -1 - ((p - j) + (p - i)*pp1); // (2,1,0,3)
+            QuadDofOrd[6][o] = (p - j) + i*pp1;              // (3,0,1,2)
+            QuadDofOrd[7][o] = -1 - (i + (p - j)*pp1);       // (3,2,1,0)
+            if (!signs)
             {
-               int o = i + j*pp1;
-               QuadDofOrd[0][o] = i + j*pp1;                    // (0,1,2,3)
-               QuadDofOrd[1][o] = -1 - (j + i*pp1);             // (0,3,2,1)
-               QuadDofOrd[2][o] = j + (p - i)*pp1;              // (1,2,3,0)
-               QuadDofOrd[3][o] = -1 - ((p - i) + j*pp1);       // (1,0,3,2)
-               QuadDofOrd[4][o] = (p - i) + (p - j)*pp1;        // (2,3,0,1)
-               QuadDofOrd[5][o] = -1 - ((p - j) + (p - i)*pp1); // (2,1,0,3)
-               QuadDofOrd[6][o] = (p - j) + i*pp1;              // (3,0,1,2)
-               QuadDofOrd[7][o] = -1 - (i + (p - j)*pp1);       // (3,2,1,0)
-               if (!signs)
+               for (int k = 1; k < 8; k += 2)
                {
-                  for (int k = 1; k < 8; k += 2)
-                  {
-                     QuadDofOrd[k][o] = -1 - QuadDofOrd[k][o];
-                  }
+                  QuadDofOrd[k][o] = -1 - QuadDofOrd[k][o];
                }
             }
          }
