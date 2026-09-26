@@ -1,6 +1,8 @@
 //                             MFEM Example 43 HX
 //
 // Compile with: make ex43_hx
+// Sample runs: ex43_hx -gmg -r 3 -random-rhs
+//              ex43_hx -gmg -aw -r 3 -random-rhs
 //
 // Description: Solve a div-div plus mass problem for a symmetric matrix
 // field using lowest-order 2D Johnson--Mercier, Arnold--Winther, or Hu--Zhang elements
@@ -13,6 +15,8 @@
 // from continuous piecewise-linear symmetric matrices, B_1 is the inverse of
 // the matrix H1 operator, J is the Airy map from the HCT, Argyris, or Bell space, and B_2 is the
 // inverse of the corresponding biharmonic operator.
+// With -gmg, B_1 and B_2 are replaced by geometric multigrid V-cycles with
+// Gauss-Seidel smoothing and rediscretized operators on each mesh level.
 
 #include "ex43.hpp"
 #include <cstring>
@@ -24,13 +28,87 @@ using namespace std;
 
 enum class HXSmoother { VERTEX_PATCH, JACOBI, GAUSS_SEIDEL };
 
+static unique_ptr<Solver> MakeInverse(SparseMatrix &op)
+{
+#ifdef MFEM_USE_SUITESPARSE
+   return unique_ptr<Solver>(new UMFPackSolver(op));
+#else
+   CGSolver *inverse = new CGSolver;
+   inverse->iterative_mode = false;
+   inverse->SetOperator(op);
+   inverse->SetRelTol(1e-12);
+   inverse->SetAbsTol(0.0);
+   inverse->SetMaxIter(20000);
+   inverse->SetPrintLevel(0);
+   return unique_ptr<Solver>(inverse);
+#endif
+}
+
+static void GetPotentialGaugeDofs(FiniteElementSpace &fes, Array<int> &dofs)
+{
+   // Hessians annihilate affine functions. Fix value and both first
+   // derivatives at one vertex to select a representative modulo P1.
+   fes.GetVertexDofs(0, dofs);
+   // Argyris and Bell also have three second derivatives at each vertex; those
+   // are not in the affine kernel and must remain unconstrained.
+   dofs.SetSize(3);
+   for (int i = 0; i < dofs.Size(); i++) { dofs[i] = UnsignIndex(dofs[i]); }
+}
+
+// Assemble either the weighted matrix H1 operator or, with a null weight,
+// the biharmonic operator. Both use a forward GS pre-sweep and its transpose
+// for the post-sweep, preserving symmetry for the outer CG solve.
+class HXMultigrid : public GeometricMultigrid
+{
+public:
+   HXMultigrid(FiniteElementSpaceHierarchy &hierarchy, MatrixCoefficient *weight)
+      : GeometricMultigrid(hierarchy, Array<int>())
+   {
+      for (int level = 0; level < hierarchy.GetNumLevels(); level++)
+      {
+         FiniteElementSpace &fes = hierarchy.GetFESpaceAtLevel(level);
+         BilinearForm *form = new BilinearForm(&fes);
+         if (weight)
+         {
+            form->AddDomainIntegrator(new VectorMassIntegrator(*weight));
+            form->AddDomainIntegrator(new VectorDiffusionIntegrator(*weight));
+         }
+         else
+         {
+            form->AddDomainIntegrator(new HessianIntegrator);
+            GetPotentialGaugeDofs(fes, *essentialTrueDofs[level]);
+            if (level > 0)
+            {
+               // Preserve the point gauge under both prolongation and
+               // restriction, without imposing clamped boundary conditions.
+               prolongations[level - 1] = new RectangularConstrainedOperator(
+                  hierarchy.GetProlongationAtLevel(level - 1),
+                  *essentialTrueDofs[level - 1], *essentialTrueDofs[level]);
+               ownedProlongations[level - 1] = true;
+            }
+         }
+         form->SetDiagonalPolicy(Operator::DIAG_ONE);
+         form->Assemble();
+         bfs.Append(form);
+
+         OperatorPtr system(Operator::MFEM_SPARSEMAT);
+         form->FormSystemMatrix(*essentialTrueDofs[level], system);
+         system.SetOperatorOwner(false);
+         Solver *level_solver = level == 0 ?
+                                MakeInverse(*system.As<SparseMatrix>()).release() :
+                                new GSSmoother(*system.As<SparseMatrix>(),
+                                               GSSmoother::FORWARD, 1);
+         AddLevel(system.Ptr(), level_solver, false, true);
+      }
+      SetCycleType(CycleType::VCYCLE, 1, 1);
+   }
+};
+
 class HXPreconditioner : public Solver
 {
 private:
-   H1_FECollection h1_fec;
-   FiniteElementSpace h1_fespace;
-   unique_ptr<FiniteElementCollection> potential_fec;
-   FiniteElementSpace potential_fespace;
+   FiniteElementSpace &h1_fespace;
+   FiniteElementSpace &potential_fespace;
    MatrixConstantCoefficient matrix_h1_coefficient;
    BilinearForm matrix_h1_form;
    BilinearForm biharmonic_form;
@@ -54,31 +132,14 @@ private:
       return weight;
    }
 
-   static unique_ptr<Solver> MakeInverse(SparseMatrix &op)
-   {
-#ifdef MFEM_USE_SUITESPARSE
-      return unique_ptr<Solver>(new UMFPackSolver(op));
-#else
-      CGSolver *inverse = new CGSolver;
-      inverse->iterative_mode = false;
-      inverse->SetOperator(op);
-      inverse->SetRelTol(1e-12);
-      inverse->SetAbsTol(0.0);
-      inverse->SetMaxIter(20000);
-      inverse->SetPrintLevel(0);
-      return unique_ptr<Solver>(inverse);
-#endif
-   }
-
 public:
    HXPreconditioner(const SparseMatrix &op, FiniteElementSpace &stress_fespace,
-                    const char *potential_name, HXSmoother smoother_type)
+                    FiniteElementSpaceHierarchy &h1_hierarchy,
+                    FiniteElementSpaceHierarchy &potential_hierarchy,
+                    HXSmoother smoother_type, bool use_gmg)
       : Solver(op.Height()),
-        h1_fec(1, 2),
-        h1_fespace(stress_fespace.GetMesh(), &h1_fec, 3, Ordering::byVDIM),
-        potential_fec(FiniteElementCollection::New(
-                         potential_name)),
-        potential_fespace(stress_fespace.GetMesh(), potential_fec.get()),
+        h1_fespace(h1_hierarchy.GetFinestFESpace()),
+        potential_fespace(potential_hierarchy.GetFinestFESpace()),
         matrix_h1_coefficient(MatrixH1Weight()),
         matrix_h1_form(&h1_fespace),
         biharmonic_form(&potential_fespace),
@@ -111,6 +172,15 @@ public:
       airy.Assemble();
       airy.Finalize();
 
+      GetPotentialGaugeDofs(potential_fespace, potential_gauge_dofs);
+      if (use_gmg)
+      {
+         matrix_h1_inverse.reset(new HXMultigrid(h1_hierarchy,
+                                                 &matrix_h1_coefficient));
+         biharmonic_inverse.reset(new HXMultigrid(potential_hierarchy, nullptr));
+         return;
+      }
+
       matrix_h1_form.AddDomainIntegrator(
          new VectorMassIntegrator(matrix_h1_coefficient));
       matrix_h1_form.AddDomainIntegrator(
@@ -123,15 +193,8 @@ public:
       biharmonic_form.Assemble();
       biharmonic_form.Finalize();
 
-      // Hessians annihilate affine functions. Fix value and both first
-      // derivatives at one vertex to select a representative modulo P1.
-      potential_fespace.GetVertexDofs(0, potential_gauge_dofs);
-      // Argyris and Bell also have three second derivatives at each vertex; those
-      // are not in the affine kernel and must remain unconstrained.
-      potential_gauge_dofs.SetSize(3);
       for (int i = 0; i < potential_gauge_dofs.Size(); i++)
       {
-         potential_gauge_dofs[i] = UnsignIndex(potential_gauge_dofs[i]);
          biharmonic_form.SpMat().EliminateRowCol(potential_gauge_dofs[i]);
       }
       biharmonic_inverse = MakeInverse(biharmonic_form.SpMat());
@@ -177,10 +240,15 @@ int main(int argc, char *argv[])
    bool use_aw = false;
    bool use_hz = false;
    bool use_hzzz = false;
+   bool use_gmg = false;
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh", "Input triangle mesh.");
    args.AddOption(&refinements, "-r", "--refinements",
                   "Number of uniform refinements.");
+   args.AddOption(&use_gmg, "-gmg", "--geometric-multigrid",
+                  "-no-gmg", "--no-geometric-multigrid",
+                  "Use a geometric multigrid V-cycle with Gauss-Seidel smoothing "
+                  "for each global auxiliary solve.");
    args.AddOption(&visualization, "-vis", "--visualization",
                   "-no-vis", "--no-visualization",
                   "Enable or disable visualization (accepted for consistency).");
@@ -198,6 +266,7 @@ int main(int argc, char *argv[])
                   "-no-hzzz", "--no-huang-zhang-zhou-zhu",
                   "Use 21-DOF HZZZ stress elements (overrides -hz/-aw/-jm).");
    args.ParseCheck();
+   MFEM_VERIFY(refinements >= 0, "Refinement count must be nonnegative.");
 
    HXSmoother smoother_type;
    if (!strcmp(smoother_name, "vertex-patch"))
@@ -221,16 +290,48 @@ int main(int argc, char *argv[])
 
    Mesh mesh(mesh_file);
    MFEM_VERIFY(mesh.Dimension() == 2, "");
-   for (int level = 0; level < refinements; level++)
+   if (!use_gmg)
    {
-      mesh.UniformRefinement();
+      for (int level = 0; level < refinements; level++)
+      {
+         mesh.UniformRefinement();
+      }
+   }
+
+   H1_FECollection h1_fec(1, 2);
+   const char *potential_name = use_hzzz ? "Bell_2D_P5" :
+                                (use_aw || use_hz ? "Argyris_2D_P5" : "HCT_2D_P3");
+   unique_ptr<FiniteElementCollection> potential_fec(
+      FiniteElementCollection::New(potential_name));
+   FiniteElementSpaceHierarchy h1_hierarchy(
+      &mesh, new FiniteElementSpace(&mesh, &h1_fec, 3, Ordering::byVDIM),
+      false, true);
+   // Both auxiliary hierarchies and the stress space share the same meshes.
+   // Refined meshes are owned by h1_hierarchy, which outlives potential_hierarchy.
+   FiniteElementSpaceHierarchy potential_hierarchy(
+      &mesh, new FiniteElementSpace(&mesh, potential_fec.get()), false, true);
+   for (int level = 0; use_gmg && level < refinements; level++)
+   {
+      h1_hierarchy.AddUniformlyRefinedLevel(3, Ordering::byVDIM,
+                                            Operator::MFEM_SPARSEMAT);
+      Mesh *fine_mesh = h1_hierarchy.GetFinestFESpace().GetMesh();
+      FiniteElementSpace *fine_potential =
+         new FiniteElementSpace(fine_mesh, potential_fec.get());
+      OperatorPtr transfer(Operator::MFEM_SPARSEMAT);
+      // HCT and Bell are nonnested: use DOF interpolation, as in biharmonic_gmg.
+      fine_potential->GetTrueTransferOperator(
+         potential_hierarchy.GetFinestFESpace(), transfer);
+      potential_hierarchy.AddLevel(fine_mesh, fine_potential, transfer.Ptr(),
+                                   false, true, true);
+      transfer.SetOperatorOwner(false);
    }
 
    const char *fec_name = use_hzzz ? "HZZZ_2D_P3" :
                           (use_hz ? "HZ_2D_P3" :
                            (use_aw ? "AW_2D_P3" : "JM_2D_P1"));
    unique_ptr<FiniteElementCollection> fec(FiniteElementCollection::New(fec_name));
-   FiniteElementSpace fespace(&mesh, fec.get());
+   FiniteElementSpace fespace(h1_hierarchy.GetFinestFESpace().GetMesh(),
+                              fec.get());
    cout << "\n" << fec->Name() << " space: " << fespace.GetNE()
         << " elements, " << fespace.GetTrueVSize() << " unknowns\n";
 
@@ -254,9 +355,8 @@ int main(int argc, char *argv[])
    a.FormLinearSystem(ess_tdof_list, solution, b, A, X, B);
    if (random_rhs) { B.Randomize(1); }
 
-   const char *potential_name = use_hzzz ? "Bell_2D_P5" :
-                                (use_aw || use_hz ? "Argyris_2D_P5" : "HCT_2D_P3");
-   HXPreconditioner hx(A, fespace, potential_name, smoother_type);
+   HXPreconditioner hx(A, fespace, h1_hierarchy, potential_hierarchy,
+                       smoother_type, use_gmg);
    CGSolver solver;
    solver.SetOperator(A);
    solver.SetPreconditioner(hx);
