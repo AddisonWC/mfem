@@ -246,7 +246,7 @@ JohnsonMercierTriangleFiniteElement::JohnsonMercierTriangleFiniteElement(
       {
          const real_t r = basis_type == JMBasis::Moments ? 0.5 : j/2;
          Nodes.IntPoint(4*edge + j).Set2((1.0-r)*a[0] + r*b[0],
-                                        (1.0-r)*a[1] + r*b[1]);
+                                         (1.0-r)*a[1] + r*b[1]);
       }
    }
    for (int j = 12; j < 15; j++)
@@ -397,7 +397,7 @@ void JohnsonMercierTriangleFiniteElement::GetMomentToSplitVertexMatrix(
       const real_t *b = vertices[edge_vertices[edge][1]];
       const real_t dx = b[0]-a[0], dy = b[1]-a[1];
       const real_t length = std::hypot(J(0,0)*dx + J(0,1)*dy,
-                                      J(1,0)*dx + J(1,1)*dy);
+                                       J(1,0)*dx + J(1,1)*dy);
       for (int comp = 0; comp < 2; comp++)
       {
          const int i = 4*edge + comp;
