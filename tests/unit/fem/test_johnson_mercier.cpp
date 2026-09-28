@@ -390,7 +390,7 @@ TEST_CASE("Johnson-Mercier finite element space transfer",
    Mesh fine_mesh(coarse_mesh);
    fine_mesh.UniformRefinement();
    JohnsonMercierFECollection fec(GENERATE(JMBasis::Moments,
-                                          JMBasis::SplitVertex));
+                                           JMBasis::SplitVertex));
    const int vdim = GENERATE(1, 2);
    const auto ordering = GENERATE(Ordering::byNODES, Ordering::byVDIM);
    FiniteElementSpace coarse_fes(&coarse_mesh, &fec, vdim, ordering);
@@ -468,7 +468,8 @@ TEST_CASE("Johnson-Mercier assembly", "[BilinearForm][JohnsonMercier]")
    REQUIRE(load.Norml2() > 0.0);
 }
 
-TEST_CASE("Johnson-Mercier split-vertex basis", "[FiniteElement][JohnsonMercier]")
+TEST_CASE("Johnson-Mercier split-vertex basis",
+          "[FiniteElement][JohnsonMercier]")
 {
    JohnsonMercierTriangleFiniteElement moment, vertex(JMBasis::SplitVertex);
    std::unique_ptr<FiniteElementCollection> factory(
@@ -504,7 +505,8 @@ TEST_CASE("Johnson-Mercier split-vertex basis", "[FiniteElement][JohnsonMercier]
       {
          int ids[3] = {(child+1)%3, (child+2)%3, 3};
          DenseTensor samples[3] = {DenseTensor(2,2,15),
-                                   DenseTensor(2,2,15), DenseTensor(2,2,15)};
+                                   DenseTensor(2,2,15), DenseTensor(2,2,15)
+                                  };
          for (int q = 0; q < 3; q++)
          {
             IntegrationPoint ip;
@@ -547,7 +549,7 @@ TEST_CASE("Johnson-Mercier split-vertex basis", "[FiniteElement][JohnsonMercier]
                   for (int j = 0; j < 2; j++)
                   {
                      const real_t val = 2*samples[q](i,j,k) -
-                        (samples[0](i,j,k)+samples[1](i,j,k)+samples[2](i,j,k))/3;
+                                        (samples[0](i,j,k)+samples[1](i,j,k)+samples[2](i,j,k))/3;
                      REQUIRE(std::abs(val) < 1e-10);
                   }
                }
@@ -562,7 +564,7 @@ TEST_CASE("Johnson-Mercier physical traction continuity",
 {
    Mesh mesh = Mesh::MakeCartesian2D(2, 2, Element::TRIANGLE, true);
    JohnsonMercierFECollection fec(GENERATE(JMBasis::Moments,
-                                          JMBasis::SplitVertex));
+                                           JMBasis::SplitVertex));
    FiniteElementSpace fes(&mesh, &fec);
    Vector x(fes.GetVSize());
    for (int i = 0; i < x.Size(); i++) { x(i) = std::sin(real_t(i + 1)); }
@@ -619,7 +621,7 @@ TEST_CASE("Johnson-Mercier physical interpolation invariants",
    Mesh fine_mesh(coarse_mesh);
    fine_mesh.UniformRefinement();
    JohnsonMercierFECollection fec(GENERATE(JMBasis::Moments,
-                                          JMBasis::SplitVertex));
+                                           JMBasis::SplitVertex));
    FiniteElementSpace coarse(&coarse_mesh, &fec), fine(&fine_mesh, &fec);
    OperatorHandle P(Operator::MFEM_SPARSEMAT);
    fine.GetTransferOperator(coarse, P);

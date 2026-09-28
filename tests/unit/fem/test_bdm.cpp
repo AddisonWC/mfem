@@ -60,7 +60,7 @@ TEST_CASE("BDM polynomial reproduction", "[BDM]")
             {
                CAPTURE(c, a, b, k);
                VectorFunctionCoefficient coefficient(dim,
-               [=](const Vector &x, Vector &v)
+                                                     [=](const Vector &x, Vector &v)
                {
                   v = 0.0;
                   v[c] = std::pow(x[0], a)*std::pow(x[1], b);
@@ -196,7 +196,7 @@ TEST_CASE("BDM refinement transfer", "[BDM]")
    FiniteElementSpace fes(&mesh, &fec);
    GridFunction field(&fes);
    VectorFunctionCoefficient coefficient(dim,
-   [=](const Vector &x, Vector &v)
+                                         [=](const Vector &x, Vector &v)
    {
       for (int d = 0; d < dim; d++)
       {

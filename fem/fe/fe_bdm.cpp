@@ -83,7 +83,7 @@ BDM_TriangleElement::BDM_TriangleElement(const int p, const int ob_type)
 }
 
 void BDM_TriangleElement::CalcVShape(const IntegrationPoint &ip,
-                                   DenseMatrix &shape) const
+                                     DenseMatrix &shape) const
 {
    const int p = order;
 #ifdef MFEM_THREAD_SAFE
@@ -105,7 +105,7 @@ void BDM_TriangleElement::CalcVShape(const IntegrationPoint &ip,
 }
 
 void BDM_TriangleElement::CalcDivShape(const IntegrationPoint &ip,
-                                     Vector &divshape) const
+                                       Vector &divshape) const
 {
    const int p = order;
 #ifdef MFEM_THREAD_SAFE
@@ -131,11 +131,13 @@ void BDM_TriangleElement::CalcDivShape(const IntegrationPoint &ip,
 
 
 const real_t BDM_TetrahedronElement::nk[30] =
-{ 1.,1.,1.,  -1.,0.,0.,  0.,-1.,0.,  0.,0.,-1.,
-  1.,0.,0.,  0.,1.,0.,  0.,0.,1.,  -1.,1.,0.,  -1.,0.,1.,  0.,-1.,1. };
+{
+   1.,1.,1.,  -1.,0.,0.,  0.,-1.,0.,  0.,0.,-1.,
+   1.,0.,0.,  0.,1.,0.,  0.,0.,1.,  -1.,1.,0.,  -1.,0.,1.,  0.,-1.,1.
+};
 
 BDM_TetrahedronElement::BDM_TetrahedronElement(const int p,
-                                             const int ob_type)
+                                               const int ob_type)
    : VectorFiniteElement(3, Geometry::TETRAHEDRON,
                          (p + 1)*(p + 2)*(p + 3)/2, p,
                          H_DIV, FunctionSpace::Pk),
@@ -160,43 +162,43 @@ BDM_TetrahedronElement::BDM_TetrahedronElement(const int p,
 
    int o = 0;
    for (int j = 0; j <= p; j++) for (int i = 0; i + j <= p; i++)
-   {
-      const real_t w = bop[i] + bop[j] + bop[p-i-j];
-      Nodes.IntPoint(o).Set3(bop[p-i-j]/w, bop[i]/w, bop[j]/w);
-      dof2nk[o++] = 0;
-   }
+      {
+         const real_t w = bop[i] + bop[j] + bop[p-i-j];
+         Nodes.IntPoint(o).Set3(bop[p-i-j]/w, bop[i]/w, bop[j]/w);
+         dof2nk[o++] = 0;
+      }
    for (int j = 0; j <= p; j++) for (int i = 0; i + j <= p; i++)
-   {
-      const real_t w = bop[i] + bop[j] + bop[p-i-j];
-      Nodes.IntPoint(o).Set3(0., bop[j]/w, bop[i]/w); dof2nk[o++] = 1;
-   }
+      {
+         const real_t w = bop[i] + bop[j] + bop[p-i-j];
+         Nodes.IntPoint(o).Set3(0., bop[j]/w, bop[i]/w); dof2nk[o++] = 1;
+      }
    for (int j = 0; j <= p; j++) for (int i = 0; i + j <= p; i++)
-   {
-      const real_t w = bop[i] + bop[j] + bop[p-i-j];
-      Nodes.IntPoint(o).Set3(bop[i]/w, 0., bop[j]/w); dof2nk[o++] = 2;
-   }
+      {
+         const real_t w = bop[i] + bop[j] + bop[p-i-j];
+         Nodes.IntPoint(o).Set3(bop[i]/w, 0., bop[j]/w); dof2nk[o++] = 2;
+      }
    for (int j = 0; j <= p; j++) for (int i = 0; i + j <= p; i++)
-   {
-      const real_t w = bop[i] + bop[j] + bop[p-i-j];
-      Nodes.IntPoint(o).Set3(bop[j]/w, bop[i]/w, 0.); dof2nk[o++] = 3;
-   }
+      {
+         const real_t w = bop[i] + bop[j] + bop[p-i-j];
+         Nodes.IntPoint(o).Set3(bop[j]/w, bop[i]/w, 0.); dof2nk[o++] = 3;
+      }
 
    // Cell-local edge and face tangential samples, as in ND_{p-1}.
    const int edge_dir[6] = {4,5,6,7,8,9};
    for (int e = 0; e < 6; e++) for (int i = 0; i < q; i++)
-   {
-      const real_t a = eop[i], b = eop[q-1-i];
-      switch (e)
       {
-         case 0: Nodes.IntPoint(o).Set3(a,0.,0.); break;
-         case 1: Nodes.IntPoint(o).Set3(0.,a,0.); break;
-         case 2: Nodes.IntPoint(o).Set3(0.,0.,a); break;
-         case 3: Nodes.IntPoint(o).Set3(b,a,0.); break;
-         case 4: Nodes.IntPoint(o).Set3(b,0.,a); break;
-         default: Nodes.IntPoint(o).Set3(0.,b,a); break;
+         const real_t a = eop[i], b = eop[q-1-i];
+         switch (e)
+         {
+            case 0: Nodes.IntPoint(o).Set3(a,0.,0.); break;
+            case 1: Nodes.IntPoint(o).Set3(0.,a,0.); break;
+            case 2: Nodes.IntPoint(o).Set3(0.,0.,a); break;
+            case 3: Nodes.IntPoint(o).Set3(b,a,0.); break;
+            case 4: Nodes.IntPoint(o).Set3(b,0.,a); break;
+            default: Nodes.IntPoint(o).Set3(0.,b,a); break;
+         }
+         dof2nk[o++] = edge_dir[e];
       }
-      dof2nk[o++] = edge_dir[e];
-   }
 
    const int face_dir[4][2] = {{7,8},{6,5},{4,6},{5,4}};
    for (int f = 0; f < 4; f++)
@@ -252,7 +254,7 @@ BDM_TetrahedronElement::BDM_TetrahedronElement(const int p,
 }
 
 void BDM_TetrahedronElement::CalcVShape(const IntegrationPoint &ip,
-                                      DenseMatrix &shape) const
+                                        DenseMatrix &shape) const
 {
    const int p = order;
 #ifdef MFEM_THREAD_SAFE
@@ -277,7 +279,7 @@ void BDM_TetrahedronElement::CalcVShape(const IntegrationPoint &ip,
 }
 
 void BDM_TetrahedronElement::CalcDivShape(const IntegrationPoint &ip,
-                                        Vector &divshape) const
+                                          Vector &divshape) const
 {
    const int p = order;
 #ifdef MFEM_THREAD_SAFE
