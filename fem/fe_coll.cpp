@@ -201,6 +201,10 @@ FiniteElementCollection *FiniteElementCollection::New(const char *name)
    {
       fec = new HZZZFECollection;
    }
+   else if (!strcmp(name, "HZZZr_2D_P3"))
+   {
+      fec = new HZZZReducedFECollection;
+   }
    else if (!strcmp(name, "Argyris_2D_P5"))
    {
       fec = new ArgyrisFECollection;
@@ -1162,6 +1166,40 @@ const int *HZZZFECollection::DofOrderForOrientation(
    if (GeomType != Geometry::SEGMENT) { return nullptr; }
    // Reversing an edge reverses both n and t: the constant nn and nt
    // moments are unchanged, while the linear moment polynomial changes sign.
+   static int ind_pos[] = {0, 1, 2};
+   static int ind_neg[] = {0, 1, -3};
+   return Or > 0 ? ind_pos : ind_neg;
+}
+
+const FiniteElement *
+HZZZReducedFECollection::FiniteElementForGeometry(
+   Geometry::Type GeomType) const
+{
+   if (GeomType == Geometry::TRIANGLE) { return &TriangleFE; }
+   if (error_mode == RETURN_NULL) { return nullptr; }
+   MFEM_ABORT("HZZZReducedFECollection supports triangles only");
+   return nullptr;
+}
+
+int HZZZReducedFECollection::DofForGeometry(
+   Geometry::Type GeomType) const
+{
+   switch (GeomType)
+   {
+      case Geometry::POINT: return 3;
+      case Geometry::SEGMENT: return 3;
+      case Geometry::TRIANGLE: return 0;
+      default:
+         MFEM_ABORT("HZZZReducedFECollection supports triangles only");
+   }
+   return 0;
+}
+
+const int *HZZZReducedFECollection::DofOrderForOrientation(
+   Geometry::Type GeomType, int Or) const
+{
+   // Same edge DOFs as HZZZFECollection.
+   if (GeomType != Geometry::SEGMENT) { return nullptr; }
    static int ind_pos[] = {0, 1, 2};
    static int ind_neg[] = {0, 1, -3};
    return Or > 0 ? ind_pos : ind_neg;

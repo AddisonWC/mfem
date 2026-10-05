@@ -3,9 +3,11 @@
 // Compile with: make ex43_hx
 // Sample runs: ex43_hx -gmg -r 3 -random-rhs
 //              ex43_hx -gmg -e aw -r 3 -random-rhs
+//              ex43_hx -gmg -e hzzzr -r 3 -random-rhs
 //
 // Description: Solve a div-div plus mass problem for a symmetric matrix
-// field using lowest-order 2D Johnson--Mercier, Arnold--Winther, or Hu--Zhang elements
+// field using lowest-order 2D Johnson--Mercier, Arnold--Winther, Hu--Zhang, or
+// (reduced) Huang--Zhang--Zhou--Zhu elements
 // and the auxiliary space preconditioner
 //
 //                 R + Pi B_1 Pi^t + J B_2 J^t.
@@ -254,7 +256,7 @@ int main(int argc, char *argv[])
                   "-constant-rhs", "--constant-rhs",
                   "Use a reproducible random algebraic right-hand side.");
    args.AddOption(&element_name, "-e", "--element",
-                  "Stress element: jm, aw, hz, or hzzz.");
+                  "Stress element: jm, aw, hz, hzzz, or hzzzr (reduced HZZZ).");
    args.AddOption(&smoother_name, "-s", "--smoother",
                   "HX smoother: vertex-patch (default), jacobi, or gauss-seidel "
                   "(symmetric forward/backward sweeps).");
@@ -283,10 +285,15 @@ int main(int argc, char *argv[])
       fec_name = "HZZZ_2D_P3";
       potential_name = "Bell_2D_P5";
    }
+   else if (element_name == "hzzzr")
+   {
+      fec_name = "HZZZr_2D_P3";
+      potential_name = "Bell_2D_P5";
+   }
    else
    {
       MFEM_ABORT("Unknown stress element '" << element_name
-                 << "'. Choose jm, aw, hz, or hzzz.");
+                 << "'. Choose jm, aw, hz, hzzz, or hzzzr.");
    }
 
    HXSmoother smoother_type;

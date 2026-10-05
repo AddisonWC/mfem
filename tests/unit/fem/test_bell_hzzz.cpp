@@ -689,3 +689,168 @@ TEST_CASE("Bell physical quartic refinement", "[Transfer][Bell]")
       }
    }
 }
+
+TEST_CASE("Reduced HZZZ physical degrees of freedom and divergence",
+          "[FiniteElement][HZZZ]")
+{
+   ReducedHuangZhangZhouZhuTriangleFiniteElement fe;
+   HuangZhangZhouZhuTriangleFiniteElement full;
+   const int geometry = GENERATE(0,1,2);
+   IsoparametricTransformation T;
+   T.SetIdentityTransformation(Geometry::TRIANGLE);
+   DenseMatrix points(2,3);
+   points = T.GetPointMat();
+   if (geometry)
+   {
+      points(0,0)=0.2; points(1,0)=-0.3;
+      points(0,1)=1.6; points(1,1)=0.1;
+      points(0,2)=0.5; points(1,2)=geometry == 2 ? -1.1 : 0.8;
+      T.SetPointMat(points);
+   }
+   REQUIRE(fe.GetDof() == 18);
+   // The reduced basis is the HZZZ basis plus interior bubbles, so its
+   // vertex and edge DOFs are those of the corresponding HZZZ functions.
+   const IntegrationRule &ir = IntRules.Get(Geometry::TRIANGLE,6);
+   DenseTensor shape(2,2,18), full_shape(2,2,21);
+   DenseMatrix div(18,2);
+   real_t trace_error = 0.0, rm_error = 0.0;
+   // div shapes are linear: recover their gradients from three points.
+   DenseMatrix div_at(3*18,2), x(2,3);
+   const real_t corners[3][2] = {{0.1,0.1}, {0.7,0.2}, {0.2,0.6}};
+   for (int p = 0; p < 3; p++)
+   {
+      IntegrationPoint ip;
+      ip.Set2(corners[p][0],corners[p][1]);
+      T.SetIntPoint(&ip);
+      Vector xp(2);
+      T.Transform(ip,xp);
+      x(0,p) = xp(0); x(1,p) = xp(1);
+      fe.CalcPhysDivShape(T,div);
+      for (int i = 0; i < 18; i++)
+      {
+         div_at(18*p+i,0) = div(i,0);
+         div_at(18*p+i,1) = div(i,1);
+      }
+   }
+   DenseMatrix X(2), Xinv(2);
+   for (int a = 0; a < 2; a++)
+   {
+      for (int p = 1; p < 3; p++) { X(a,p-1) = x(a,p) - x(a,0); }
+   }
+   CalcInverse(X,Xinv);
+   for (int i = 0; i < 18; i++)
+   {
+      // grad(c,a) = d(div_c)/dx_a from the differences along X's columns.
+      DenseMatrix D(2), grad(2);
+      for (int c = 0; c < 2; c++)
+      {
+         for (int p = 1; p < 3; p++)
+         { D(c,p-1) = div_at(18*p+i,c) - div_at(i,c); }
+      }
+      Mult(D,Xinv,grad);
+      rm_error = std::max({rm_error, std::abs(grad(0,0)), std::abs(grad(1,1)),
+                           std::abs(grad(0,1)+grad(1,0))});
+   }
+   // Boundary traces agree with HZZZ because the correction is a bubble.
+   const IntegrationRule &er = IntRules.Get(Geometry::SEGMENT,6);
+   for (int q = 0; q < er.GetNPoints(); q++)
+   {
+      const IntegrationPoint &ip = er.IntPoint(q);
+      for (int e = 0; e < 3; e++)
+      {
+         const int a = edge_vertices[e][0], b = edge_vertices[e][1];
+         IntegrationPoint ep;
+         ep.Set2(vertices[a][0]+ip.x*(vertices[b][0]-vertices[a][0]),
+                 vertices[a][1]+ip.x*(vertices[b][1]-vertices[a][1]));
+         T.SetIntPoint(&ep);
+         fe.CalcMShape(T,shape);
+         full.CalcMShape(T,full_shape);
+         const real_t dx = points(0,b)-points(0,a), dy = points(1,b)-points(1,a);
+         const real_t nx = dy, ny = -dx;
+         for (int j = 0; j < 18; j++)
+         {
+            for (int r = 0; r < 2; r++)
+            {
+               const real_t tn = shape(r,0,j)*nx + shape(r,1,j)*ny;
+               const real_t ftn = full_shape(r,0,j)*nx + full_shape(r,1,j)*ny;
+               trace_error = std::max(trace_error, std::abs(tn - ftn));
+            }
+         }
+      }
+   }
+   REQUIRE(trace_error < 1e-10);
+   REQUIRE(rm_error < 1e-10);
+
+   // P1 symmetric matrices are reproduced by the canonical interpolant.
+   H1_TriangleElement p1(1);
+   DenseMatrix I;
+   fe.Project(p1,T,I);
+   REQUIRE(I.Height() == 18);
+   REQUIRE(I.Width() == 9);
+   Vector values(3), p1_shape(3), coeffs(9);
+   for (int i = 0; i < 9; i++) { coeffs(i) = std::sin(real_t(i+2)); }
+   Vector dofs(18);
+   I.Mult(coeffs,dofs);
+   real_t p1_error = 0.0;
+   for (int q = 0; q < ir.GetNPoints(); q++)
+   {
+      const IntegrationPoint &ip = ir.IntPoint(q);
+      T.SetIntPoint(&ip);
+      fe.CalcMShape(T,shape);
+      p1.CalcShape(ip,p1_shape);
+      const int row[3] = {0,0,1}, col[3] = {0,1,1};
+      for (int c = 0; c < 3; c++)
+      {
+         real_t exact = 0.0, computed = 0.0;
+         for (int k = 0; k < 3; k++) { exact += coeffs(3*c+k)*p1_shape(k); }
+         for (int j = 0; j < 18; j++) { computed += dofs(j)*shape(row[c],col[c],j); }
+         p1_error = std::max(p1_error, std::abs(exact - computed));
+      }
+   }
+   REQUIRE(p1_error < 1e-10);
+}
+
+TEST_CASE("Bell to reduced HZZZ Airy interpolation",
+          "[DiscreteInterpolator][AiryInterpolator][HZZZ]")
+{
+   Mesh mesh = Mesh::MakeCartesian2D(3, 2, Element::TRIANGLE, true);
+   for (int vertex = 0; vertex < mesh.GetNV(); vertex++)
+   {
+      real_t *point = mesh.GetVertex(vertex);
+      const real_t x = point[0];
+      const real_t y = point[1];
+      point[0] = 0.2 + 1.4*x + 0.3*y + 0.05*std::sin(7*x*y);
+      point[1] = -0.1 + 0.2*x + 0.8*y + 0.04*std::cos(5*x+3*y);
+   }
+   BellFECollection bell_collection;
+   HZZZReducedFECollection stress_collection;
+   FiniteElementSpace bell_space(&mesh, &bell_collection);
+   FiniteElementSpace stress_space(&mesh, &stress_collection);
+   REQUIRE(stress_space.GetVSize() == 3*mesh.GetNV() + 3*mesh.GetNEdges());
+   DiscreteLinearOperator airy(&bell_space, &stress_space);
+   airy.AddDomainInterpolator(new AiryInterpolator);
+   airy.Assemble();
+   airy.Finalize();
+
+   Vector potential(bell_space.GetVSize()), stress(stress_space.GetVSize());
+   for (int i = 0; i < potential.Size(); i++)
+   {
+      potential(i) = std::sin(real_t(i + 1));
+   }
+   airy.Mult(potential, stress);
+
+   BilinearForm mass(&stress_space), biharmonic(&bell_space),
+                divdiv(&stress_space);
+   mass.AddDomainIntegrator(new MatrixFEMassIntegrator);
+   biharmonic.AddDomainIntegrator(new HessianIntegrator);
+   divdiv.AddDomainIntegrator(new MatrixDivDivIntegrator);
+   mass.Assemble(); mass.Finalize();
+   biharmonic.Assemble(); biharmonic.Finalize();
+   divdiv.Assemble(); divdiv.Finalize();
+   Vector work(stress.Size()), pwork(potential.Size());
+   mass.Mult(stress,work);
+   biharmonic.Mult(potential,pwork);
+   REQUIRE((stress*work) == Approx(potential*pwork).epsilon(1e-10));
+   divdiv.Mult(stress,work);
+   REQUIRE(work.Norml2() < 1e-7);
+}

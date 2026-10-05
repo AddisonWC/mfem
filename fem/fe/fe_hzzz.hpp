@@ -57,6 +57,41 @@ public:
    void GetFaceDofs(int face, int **dofs, int *ndofs) const override;
 };
 
+/** The 18-DOF reduced Huang--Zhang--Zhou--Zhu stress triangle from Section
+    2.5 of https://arxiv.org/abs/2310.13920: the HZZZ shape functions whose
+    divergence is a rigid motion, airy P5^- + sym(RM x^T).
+
+    DOFs: the vertex and edge DOFs of the 21-DOF HZZZ element. Each basis
+    function is the corresponding HZZZ basis function plus the combination of
+    HZZZ interior bubbles making its divergence L2(K)-orthogonal to
+    div of the bubbles, i.e. to P1(K;R^2)/RM. The constraint is imposed on the
+    physical element. Requires affine 2D maps. Its Airy potential is the Bell
+    element; the matching displacement space is piecewise rigid motions. */
+class ReducedHuangZhangZhouZhuTriangleFiniteElement : public FiniteElement
+{
+private:
+   HuangZhangZhouZhuTriangleFiniteElement hzzz;
+   DenseMatrix reference_reduction;
+   void GetReduction(ElementTransformation &T, DenseMatrix &R) const;
+   void CalcShape(const IntegrationPoint &, Vector &) const override
+   { MFEM_ABORT("reduced HZZZ shape functions are matrix-valued"); }
+   void CalcDShape(const IntegrationPoint &, DenseMatrix &) const override
+   { MFEM_ABORT("use CalcDivShape for the reduced HZZZ element"); }
+
+public:
+   ReducedHuangZhangZhouZhuTriangleFiniteElement();
+   void CalcMShape(const IntegrationPoint &ip, DenseTensor &shape) const override;
+   void CalcMShape(ElementTransformation &T, DenseTensor &shape) const override;
+   void CalcDivShape(const IntegrationPoint &ip,
+                     DenseMatrix &shape) const override;
+   void CalcPhysDivShape(ElementTransformation &T,
+                         DenseMatrix &shape) const override;
+   void Project(const FiniteElement &fe, ElementTransformation &T,
+                DenseMatrix &I) const override;
+   void GetFaceDofs(int face, int **dofs, int *ndofs) const override
+   { hzzz.GetFaceDofs(face,dofs,ndofs); }
+};
+
 } // namespace mfem
 
 #endif

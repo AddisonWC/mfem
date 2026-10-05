@@ -144,6 +144,7 @@ public:
    | ReducedHCT_2D_P3 | H2 | 3 | - | VALUE | Reduced cubic Hsieh--Clough--Tocher macroelements on triangles |
    | Bell_2D_P5 | H2 | 5 | - | VALUE | Quintic Bell elements on triangles |
    | HZZZ_2D_P3 | H(div;S) | 3 | - | DOUBLE_CONTRAVARIANT_PIOLA | 21-DOF Huang--Zhang--Zhou--Zhu elements on triangles |
+   | HZZZr_2D_P3 | H(div;S) | 3 | - | DOUBLE_CONTRAVARIANT_PIOLA | 18-DOF reduced Huang--Zhang--Zhou--Zhu elements on triangles |
    | Argyris_2D_P5 | H2 | 5 | - | VALUE | Quintic Argyris elements on triangles |
    | HZ_2D_P3 | H(div;S) | 3 | - | DOUBLE_CONTRAVARIANT_PIOLA | Lowest-order cubic Hu--Zhang elements on triangles |
    | AW_2D_P3 | H(div;S) | 3 | - | DOUBLE_CONTRAVARIANT_PIOLA | Lowest-order conforming Arnold--Winther elements on triangles |
@@ -1255,6 +1256,32 @@ public:
                                      int Or) const override;
 
    const char *Name() const override { return "HZZZ_2D_P3"; }
+
+   int GetContType() const override { return NORMAL; }
+};
+
+/** @brief Reduced lowest-order Huang--Zhang--Zhou--Zhu finite elements in 2D.
+
+    This collection is defined only on triangles. It has the vertex and edge
+    DOFs of HZZZFECollection and no interior DOFs; divergences are piecewise
+    rigid motions. */
+class HZZZReducedFECollection : public FiniteElementCollection
+{
+private:
+   const ReducedHuangZhangZhouZhuTriangleFiniteElement TriangleFE;
+
+public:
+   HZZZReducedFECollection() : FiniteElementCollection(3) { }
+
+   const FiniteElement *
+   FiniteElementForGeometry(Geometry::Type GeomType) const override;
+
+   int DofForGeometry(Geometry::Type GeomType) const override;
+
+   const int *DofOrderForOrientation(Geometry::Type GeomType,
+                                     int Or) const override;
+
+   const char *Name() const override { return "HZZZr_2D_P3"; }
 
    int GetContType() const override { return NORMAL; }
 };
