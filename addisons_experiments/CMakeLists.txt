@@ -37,6 +37,26 @@ if(BUILD_TESTING)
     PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1")
 endif()
 
+# Traction-boundary HX study; needs LAPACK only for small dense checks.
+find_package(LAPACK QUIET)
+if(LAPACK_FOUND)
+  add_executable(hx_bc "${JM_SOURCE_DIR}/hx_bc.cpp")
+  target_link_libraries(hx_bc PRIVATE mfem ${LAPACK_LIBRARIES})
+  target_compile_features(hx_bc PRIVATE cxx_std_11)
+  if(BUILD_TESTING)
+    add_test(NAME hx_bc_cohomology_check COMMAND hx_bc -e aw -bc lr -rmax 1 -check)
+    add_test(NAME hx_bc_rotated_check COMMAND hx_bc -e jm -bc bl -rot 30 -rmax 1 -check)
+    add_test(NAME hx_bc_bell_check COMMAND hx_bc -e hzzz -bc h -rmax 1 -check)
+    # Clamping only value and gradient lets the Airy image leave the space.
+    add_test(NAME hx_bc_free_hessian_fails
+             COMMAND hx_bc -e aw -bc bl -hess free -rmax 0 -check)
+    set_tests_properties(hx_bc_free_hessian_fails PROPERTIES WILL_FAIL TRUE)
+    set_tests_properties(hx_bc_cohomology_check hx_bc_rotated_check
+                         hx_bc_bell_check hx_bc_free_hessian_fails
+                         PROPERTIES ENVIRONMENT "OPENBLAS_NUM_THREADS=1")
+  endif()
+endif()
+
 # Keep the existing drivers buildable without these optional dependencies.
 option(JM_BUILD_SPECTRUM "Build the LAPACK/ARPACK HX spectral experiment" OFF)
 if(JM_BUILD_SPECTRUM)

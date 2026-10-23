@@ -44,6 +44,10 @@ OPENBLAS_NUM_THREADS=1 ./mg_compare -r 3 > mg.csv
   `-DJM_BUILD_SPECTRUM=ON` (requires LP64 LAPACK and ARPACK-ng).
 - [Square-mesh HX eigenvalue study](johnson_mercier/reports/hx_spectrum.md):
   patch sizes, auxiliary-space splitting, weight tuning, and refinement limits.
+- `johnson_mercier/hx_bc.cpp`: HX with \(\sigma n = 0\) on part of the
+  boundary, for all five stress/potential pairs (built when LAPACK is found).
+  [Report](johnson_mercier/reports/hx_bc.md): which Argyris/Bell/HCT DOFs to
+  constrain, exactness checks, and refinement studies.
 - `johnson_mercier/tests/`: experiment validation, run only by this project.
 - [HX report](johnson_mercier/reports/hx_compare.md) and
   [multigrid report](johnson_mercier/reports/mg_compare.md).
